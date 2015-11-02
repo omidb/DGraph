@@ -64,12 +64,4 @@ lazy val dgraph = crossProject
 lazy val dgraphJS = dgraph.js
 
 lazy val dgraphJVM = dgraph.jvm
-
-lazy val root = project.in(file(".")).
-  settings(commonSettings: _*).
-  settings(
-    publish := {},
-    publishLocal := {}
-  ).
-  aggregate(dgraphJS, dgraphJVM)
     
