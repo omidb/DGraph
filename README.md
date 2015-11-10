@@ -54,3 +54,56 @@ val g2 = DGraph.from[String,String](
               --("e3")->(Ref("mrk1"))))
 )
 ```
+##Graph Pattern
+This library provides algorithmes for graph matching. A pattern for matching on graphs is a graph of `DGraph[NodeMatchLike[N],EdgeMatchLike[E]]` which both `NodeMatchLike[N]` and `EdgeMatchLike[E]` contains an eval function of `T=> Boolean`
+Following all are `NodeMatchLike[N]`:
+`NodeMatchAND[N]` all the output edge-nodes should be true  
+`NodeMatchANDCons[N]` all the output edge-nodes should be true (order is important)
+`NodeMatchOR[N]` one of the output edge-nodes is enough to be true
+
+We can use our DSL to define the pattern graph:
+```scala
+val q = query[String,String](
+        <&(_ == "n0",
+            -?>(_ == "e0", <&(_ == "n1"))
+        )
+      )
+```
+
+##Graph Operations:
+let's assume we have a graph:
+```scala
+import DGraphDSL._
+      val g = DGraph.from[String,String](
+        Nd("n0",
+         --("e0")->NdMark("n1","mrk1"),
+         --("e1")->Nd("n2"),
+         --("e2")->Nd("n3",
+                    --("e3")->(Ref("mrk1"))))
+      )
+```
+and a pattern:
+```scala
+val q = query[String,String](
+        <&(_ == "n0",
+            -?>(_ == "e0", <&(_ == "n1"))
+        )
+      )
+```
+we can perform many operation on it like Scala colections:
+```scala
+ g.containsNode("n0") //check if it contains a node
+ g.containsEdge("e0") //check if it contains an edge
+   
+ g.contains(q) //check if it contains a subgraph that matches the q query
+ 
+ g.mapByNodes(_.toInt) //convert the graph by mapping nodes
+ g.mapByEdges(e => e.toInt + 1) //convert the graph by mapping edges
+ g.map(_.toInt, _.toInt + 1) //convert the graph by two different map functions
+
+
+ g.filterNodes(_.startWith("n0")) //filtering nodes
+ g.filterEdges(_.startWith("e0")) //filtering edges
+ g.filter(q) // return List[DGraph[String,String]] of sub-graphs that match the query
+```
+
