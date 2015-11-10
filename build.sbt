@@ -64,4 +64,8 @@ lazy val dgraph = crossProject
 lazy val dgraphJS = dgraph.js
 
 lazy val dgraphJVM = dgraph.jvm
+
+lazy val root = preventPublication(project.in(file(".")))
+  .settings()
+  .aggregate(dgraphJS, dgraphJVM)
     

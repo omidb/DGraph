@@ -133,13 +133,6 @@ object DGraphDSL {
   def NdMark[N,E](n:N, marker:String, edges:HalfEdgeLike[E,N]*) = QNodeMarker[N,E](n,marker, edges:_*)
   def Ref[N,E](marker:String, edges:HalfEdgeLike[E,N]*) = QNodeRef[N,E](marker, edges:_*)
 
-//  case class --?[N,EE[E],E](eval:E => Boolean) extends HalfEdgeLike[EdgeMatchLike[E],NodeMatchLike[N]] {
-//    def -->(qNode: QNodeLike[NodeMatchLike[N],EdgeMatchLike[E]]):HalfEdge[EdgeMatchLike[E],NodeMatchLike[N]] =
-//      HalfEdge(EdgeMatch(eval), qNode)
-//  }
-
-
-
 
   def query[N,E](qNodes:QNodeLike[NodeMatchLike[N],EdgeMatchLike[E]]):DGraph[NodeMatchLike[N],EdgeMatchLike[E]] =
    DGraph.from(qNodes)
@@ -158,6 +151,9 @@ object DGraphDSL {
 
   def <||[N,E](n:N => Boolean, marker:String, edges:HalfEdgeLike[E,NodeMatchLike[N]]*) =
     QNodeMarker[NodeMatchLike[N],E](NodeMatchOR(n),marker,edges:_*)
+
+  def anyNode[N](n:N):Boolean = true
+  def anyEdge[E](e:E):Boolean = true
 
 }
 

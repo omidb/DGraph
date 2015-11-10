@@ -69,7 +69,6 @@ object GraphMatch {
         var branches = Queue.empty[Branch[N]]
         val ss = Branch(Map.empty[Node[NodeMatchLike[N]], Node[N]], Map[Node[N], Node[NodeMatchLike[N]]](n -> r))
 
-
         if(finalSolutions.isEmpty)
           branches = branches.enqueue(Branch(Map.empty[Node[NodeMatchLike[N]], Node[N]], 
             Map[Node[N], Node[NodeMatchLike[N]]](n -> r)))
