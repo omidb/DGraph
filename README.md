@@ -15,7 +15,7 @@ Using:
  
  There are two main ways to create graphs:
  
- ###Using Nodes and Edges
+ **Using Nodes and Edges**
  
 ```scala
 val nodes = Map(0 -> Node("n0", 0), 1 -> Node("n1", 1), 2 -> Node("n2", 2))
