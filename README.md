@@ -57,9 +57,9 @@ val g2 = DGraph.from[String,String](
 ##Graph Pattern
 This library provides algorithmes for graph matching. A pattern for matching on graphs is a graph of `DGraph[NodeMatchLike[N],EdgeMatchLike[E]]` which both `NodeMatchLike[N]` and `EdgeMatchLike[E]` contains an eval function of `T=> Boolean`
 Following all are `NodeMatchLike[N]`:
-`NodeMatchAND[N]` all the output edge-nodes should be true  
-`NodeMatchANDCons[N]` all the output edge-nodes should be true (order is important)
-`NodeMatchOR[N]` one of the output edge-nodes is enough to be true
+`NodeMatchAND[N]` all the output edge-nodes should be true  `<&()`
+`NodeMatchANDCons[N]` all the output edge-nodes should be true (order is important) `<&()`
+`NodeMatchOR[N]` one of the output edge-nodes is enough to be true `<|()`
 
 We can use our DSL to define the pattern graph:
 ```scala
@@ -69,7 +69,7 @@ val q = query[String,String](
         )
       )
 ```
-
+ `-?>` is a simple `EdgeMatch` ...
 ##Graph Operations:
 let's assume we have a graph:
 ```scala
