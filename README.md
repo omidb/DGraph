@@ -26,8 +26,8 @@ val g:Dgraph[String,String] = DGraph.from(nodes,edges)
 Using `QNodeLike` and `HalfEdgeLike` you can represent different recursive graph but it will convert to `Dgraph`.
 Following all are `QNodeLike` :
 `QNode` is a simple node
-`QNodeMarker` is a node with a mark for future refrences
-`QNodeRef` is a referense to a marker node
+`QNodeMarker` is a node with a mark for future references
+`QNodeRef` is a references to a marker node
 Following all are `HalfEdgeLike` :
 `HalfEdge` is an edge to a node
 `EmprtHalfEdge` is an empty node and edge
@@ -90,7 +90,7 @@ val q = query[String,String](
         )
       )
 ```
-we can perform many operation on it like Scala colections:
+we can perform many operation on it like Scala collections:
 ```scala
  g.containsNode("n0") //check if it contains a node
  g.containsEdge("e0") //check if it contains an edge
