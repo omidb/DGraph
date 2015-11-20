@@ -13,9 +13,6 @@ case class NodeMatchANDCons[N](eval:(N => Boolean)) extends NodeMatchLike[N]
 case class NodeMatchOR[N](eval:(N => Boolean)) extends NodeMatchLike[N]
 
 
-
-
-
 trait EdgeMatchLike[E] extends Product with Serializable{
   def eval:(E => Boolean)
 }
@@ -63,11 +60,11 @@ object GraphMatch {
     val qRoots = q.roots
 
     for(r <- qRoots) {
-      val viableNodes = g.nodes.values.toList
+      val viableNodes = g.nodes.values.toList.filter(x => r.value.eval(x.value))
       var localFinalSolutions = Queue.empty[Branch[N]]
       for (n <- viableNodes) {
         var branches = Queue.empty[Branch[N]]
-        val ss = Branch(Map.empty[Node[NodeMatchLike[N]], Node[N]], Map[Node[N], Node[NodeMatchLike[N]]](n -> r))
+        //val ss = Branch(Map.empty[Node[NodeMatchLike[N]], Node[N]], Map[Node[N], Node[NodeMatchLike[N]]](n -> r))
 
         if(finalSolutions.isEmpty)
           branches = branches.enqueue(Branch(Map.empty[Node[NodeMatchLike[N]], Node[N]], 

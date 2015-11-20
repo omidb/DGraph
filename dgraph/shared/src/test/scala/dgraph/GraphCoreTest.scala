@@ -25,6 +25,9 @@ object DGraphCoreTest extends TestSuite {
          --("e2")->Nd("n3"))
       )
 
+      val g2 = DGraph.from(QNode("n0", HalfEdge("e0", QNode("n1", EmptyHalfEdge))))
+
+
 
       assert(g.nodes(0) == Node("n0", 0))
       assert(g.nodes(1) == Node("n1", 1))
@@ -80,10 +83,20 @@ object DGraphCoreTest extends TestSuite {
             -?>(_ == "e0", <&(_ == "n1"))
         )
       )
+
+      val q1 = query[String,String](
+        <&(_ == "p0",
+          -?>(_ == "e0", <&(_ == "n1"))
+        )
+      )
+
       val res = g.filter(q)
 
-      println(res)
+      val res2 = g filter q1
 
+      assert(res2.size == 0)
+
+      println(res)
     }
   }
 }
