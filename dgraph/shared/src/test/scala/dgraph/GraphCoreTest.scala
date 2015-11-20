@@ -85,7 +85,7 @@ object DGraphCoreTest extends TestSuite {
       )
 
       val q1 = query[String,String](
-        <&(_ == "p0",
+        <&(t => false,
           -?>(_ == "e0", <&(_ == "n1"))
         )
       )
