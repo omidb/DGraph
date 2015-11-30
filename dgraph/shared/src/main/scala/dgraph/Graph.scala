@@ -1,5 +1,7 @@
 package dgraph
 
+import java.util.NoSuchElementException
+
 import scala.annotation.tailrec
 import scala.collection.immutable.TreeMap
 import scala.collection.mutable
@@ -24,7 +26,11 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
   }
 
   def addNode(node:Node[N]):DGraph[N,E] = {
-    this.copy(nodes = nodes.updated(node.id,node))
+    this.copy(
+      nodes = nodes.updated(node.id,node),
+      inMap = inMap.updated(node.id,inMap.getOrElse(node.id, IndexedSeq.empty[Int])),
+      outMap = outMap.updated(node.id,outMap.getOrElse(node.id, IndexedSeq.empty[Int]))
+    )
   }
 
   def addEdge(edge:DEdge[E]):Option[DGraph[N,E]] = {
@@ -32,8 +38,8 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
       Some(
         this.copy(
           edges = edges.updated((edge.from, edge.to), edge),
-          inMap = inMap.updated(edge.to, edge.from +: inMap(edge.to)),
-          outMap = outMap.updated(edge.from, edge.to +: outMap(edge.from))
+          inMap = inMap.updated(edge.to, inMap(edge.to) :+ edge.from),
+          outMap = outMap.updated(edge.from, outMap(edge.from) :+ edge.to)
         )
       )
     } else None
@@ -94,6 +100,118 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
 //    GraphMatch.mtch(this,q).map(_.getMatchedGraph(this,q)._1)
 //  }
 
+
+  def mapDFS[NP, EP](startNode:Node[N], nodeMapper: N => NP = identity _ , edgeMapper: E => EP = identity _, avoidLoop:Boolean = true) =
+    traverse(startNode,nodeMapper,edgeMapper,true,avoidLoop)
+
+  def mapBFS[NP, EP](startNode:Node[N], nodeMapper: N => NP = identity _ , edgeMapper: E => EP = identity _, avoidLoop:Boolean = true) =
+    traverse(startNode,nodeMapper,edgeMapper,false,avoidLoop)
+
+  def foreachDFS[NP, EP](startNode:Node[N], nodeMapper: N => NP = identity _ , edgeMapper: E => EP = identity _, avoidLoop:Boolean = true) = {
+    traverse(startNode, nodeMapper, edgeMapper, true, avoidLoop)
+    Unit
+  }
+
+  def foreachBFS[NP, EP](startNode:Node[N], nodeMapper: N => NP = identity _ , edgeMapper: E => EP = identity _, avoidLoop:Boolean = true) = {
+    traverse(startNode, nodeMapper, edgeMapper, false, avoidLoop)
+    Unit
+  }
+
+  private def gfold[NB,EB](startNode:Node[N], nz:NB, ez: EB, isDFS:Boolean = true, avoidLoop:Boolean = true)(nodeOp:(NB, N) => NB, edgeOp:(EB, E) => EB) = {
+    var resultN = nz
+    var resultE = ez
+    this traverse(startNode, x => resultN = nodeOp(resultN,x), x => resultE = edgeOp(resultE,x), isDFS, avoidLoop)
+    (resultN,resultE)
+  }
+
+  def foldDFS[NB,EB](startNode:Node[N], nz:NB, ez: EB, avoidLoop:Boolean = true)(nodeOp:(NB, N) => NB, edgeOp:(EB, E) => EB) = {
+    gfold[NB,EB](startNode, nz, ez, true, avoidLoop)(nodeOp, edgeOp)
+  }
+
+  def foldBFS[NB,EB](startNode:Node[N], nz:NB, ez: EB, avoidLoop:Boolean = true)(nodeOp:(NB, N) => NB, edgeOp:(EB, E) => EB) = {
+    gfold[NB,EB](startNode, nz, ez, false, avoidLoop)(nodeOp, edgeOp)
+  }
+
+  def foldNodesDFS[NB](startNode:Node[N], nz:NB, avoidLoop:Boolean = true)(nodeOp:(NB, N) => NB) = {
+    gfold(startNode, nz, Unit, true, avoidLoop)(nodeOp, (x,y) => Unit)._1
+  }
+
+  def foldNodesBFS[NB](startNode:Node[N], nz:NB, avoidLoop:Boolean = true)(nodeOp:(NB, N) => NB) = {
+    gfold(startNode, nz, Unit, false, avoidLoop)(nodeOp, (x,y) => Unit)._1
+  }
+
+  def foldEdgesDFS[NE](startNode:Node[N], ne:NE, avoidLoop:Boolean = true)(edgeOp:(NE, E) => NE) = {
+    gfold(startNode, Unit, ne, true, avoidLoop)((x,y) => Unit,edgeOp)._2
+  }
+
+  private def traverse[NP,EP](node:Node[N], nodeF:(N => NP), edgeF:(E => EP),
+                              isDFS:Boolean = true, avoidLoop:Boolean = true) = {
+
+    if(nodes.contains(node.id)) {
+      var nodes2visit = List(node.id)
+      var edges2Visit = List.empty[(Int,Int)]
+      val visitedNodes = mutable.Set.empty[Int]
+      val visitedEdges = mutable.Set.empty[(Int,Int)]
+
+      var res = DGraph.empty[NP,EP]
+
+      while(!nodes2visit.isEmpty || !edges2Visit.isEmpty) {
+
+        val currentNode = nodes2visit.headOption
+       // println(s"Current Node: $currentNode")
+        val outs = if(currentNode.isDefined) outMap(currentNode.get) else IndexedSeq.empty[Int]
+        //
+        //node
+
+        if(avoidLoop && currentNode.isDefined) {
+          nodes2visit =
+            if(isDFS) outs.filter(o => !visitedNodes.contains(o)).toList ::: nodes2visit.tail
+            else nodes2visit.tail ::: outs.filter(o => !visitedNodes.contains(o)).toList
+        }
+        else if(!avoidLoop) {
+          nodes2visit = if(isDFS) outs.toList ::: nodes2visit.tail else nodes2visit.tail ::: outs.toList
+        }
+
+        if(currentNode.isDefined) {
+          //println(s"adding Node $currentNode")
+          visitedNodes.add(currentNode.get)
+          res = res.addNode(Node(nodeF(nodes(currentNode.get).value), currentNode.get))
+        }
+
+        //
+        //edge
+        val edgeOut =
+          if(avoidLoop && currentNode.isDefined)
+            outs.filter(o => !visitedEdges.contains((currentNode.get,o))).toList
+          else
+            outs.toList
+
+        if(!edges2Visit.isEmpty){
+          val currentEdge = edges2Visit.head
+          //println(s"adding edge $currentEdge")
+          visitedEdges.add(currentEdge)
+          res = res.addEdge(DEdge(edgeF(edges(currentEdge).value), currentEdge._1, currentEdge._2)).get
+          if(currentNode.isDefined) {
+            if(isDFS)
+              edges2Visit = edgeOut.map(o => (currentNode.get, o)) ::: edges2Visit.tail
+            else
+              edges2Visit = edges2Visit.tail ::: edgeOut.map(o => (currentNode.get, o))
+          }
+          else edges2Visit = edges2Visit.tail
+        }
+        else if(currentNode.isDefined) {
+          if(isDFS)
+            edges2Visit = edgeOut.map(o => (currentNode.get,o)) ::: edges2Visit
+          else
+            edges2Visit = edges2Visit ::: edgeOut.map(o => (currentNode.get,o))
+        }
+
+      }
+      //println("Exit!")
+      res
+    }
+    else throw new NoSuchElementException("The node is not part of the graph")
+  }
 
 }
 
