@@ -18,7 +18,7 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
   lazy val roots = inMap.filter(_._2.size == 0).map { case(ky,mp) => nodes(ky) }
 
 
-  def childs(n:Int) = if(outMap.contains(n)) outMap(n).map(nodes(_)) else IndexedSeq.empty
+  def childs(n:Int):IndexedSeq[Node[N]] = if(outMap.contains(n)) outMap(n).map(nodes(_)) else IndexedSeq.empty
 
   def childsEdges(n:Int) = {
     if (outMap.contains(n)) outMap(n).map(x => edges((n, x)))
@@ -31,6 +31,11 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
       inMap = inMap.updated(node.id,inMap.getOrElse(node.id, IndexedSeq.empty[Int])),
       outMap = outMap.updated(node.id,outMap.getOrElse(node.id, IndexedSeq.empty[Int]))
     )
+  }
+
+  def addNode(value:N):DGraph[N,E] = {
+    val maxKey = nodes.keys.max
+    addNode(Node(value,maxKey+1))
   }
 
   def addEdge(edge:DEdge[E]):Option[DGraph[N,E]] = {
@@ -101,52 +106,60 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
 //  }
 
 
-  def mapDFS[NP, EP](startNode:Node[N], nodeMapper: N => NP = identity _ , edgeMapper: E => EP = identity _, avoidLoop:Boolean = true) =
+  def mapDFS[NP, EP](startNode:Node[N], nodeMapper: (N, Int) => NP = nodeIden _,
+                     edgeMapper: (E, Int, Int) => EP = edgeIden _, avoidLoop:Boolean = true) =
     traverse(startNode,nodeMapper,edgeMapper,true,avoidLoop)
 
-  def mapBFS[NP, EP](startNode:Node[N], nodeMapper: N => NP = identity _ , edgeMapper: E => EP = identity _, avoidLoop:Boolean = true) =
+  def mapBFS[NP, EP](startNode:Node[N], nodeMapper: (N, Int) => NP = nodeIden _ ,
+                     edgeMapper: (E, Int, Int) => EP = edgeIden _, avoidLoop:Boolean = true) =
     traverse(startNode,nodeMapper,edgeMapper,false,avoidLoop)
 
-  def foreachDFS[NP, EP](startNode:Node[N], nodeMapper: N => NP = identity _ , edgeMapper: E => EP = identity _, avoidLoop:Boolean = true) = {
+  def foreachDFS[NP, EP](startNode:Node[N], nodeMapper: (N, Int) => NP = nodeIden _ ,
+                         edgeMapper: (E, Int, Int) => EP = edgeIden _, avoidLoop:Boolean = true) = {
     traverse(startNode, nodeMapper, edgeMapper, true, avoidLoop)
     Unit
   }
 
-  def foreachBFS[NP, EP](startNode:Node[N], nodeMapper: N => NP = identity _ , edgeMapper: E => EP = identity _, avoidLoop:Boolean = true) = {
+  def foreachBFS[NP, EP](startNode:Node[N], nodeMapper: (N, Int) => NP = nodeIden _ ,
+                         edgeMapper: (E, Int, Int) => EP = edgeIden _, avoidLoop:Boolean = true) = {
     traverse(startNode, nodeMapper, edgeMapper, false, avoidLoop)
     Unit
   }
 
-  private def gfold[NB,EB](startNode:Node[N], nz:NB, ez: EB, isDFS:Boolean = true, avoidLoop:Boolean = true)(nodeOp:(NB, N) => NB, edgeOp:(EB, E) => EB) = {
+  private def gfold[NB,EB](startNode:Node[N], nz:NB, ez: EB, isDFS:Boolean = true, avoidLoop:Boolean = true)
+                          (nodeOp:(NB, N, Int) => NB, edgeOp:(EB, E, Int, Int) => EB) = {
     var resultN = nz
     var resultE = ez
-    this traverse(startNode, x => resultN = nodeOp(resultN,x), x => resultE = edgeOp(resultE,x), isDFS, avoidLoop)
+    this traverse(startNode, (x, nodeIndx) => resultN = nodeOp(resultN,x,nodeIndx),
+      (x,from,to) => resultE = edgeOp(resultE,x,from,to), isDFS, avoidLoop)
     (resultN,resultE)
   }
 
-  def foldDFS[NB,EB](startNode:Node[N], nz:NB, ez: EB, avoidLoop:Boolean = true)(nodeOp:(NB, N) => NB, edgeOp:(EB, E) => EB) = {
+  def foldDFS[NB,EB](startNode:Node[N], nz:NB, ez: EB, avoidLoop:Boolean = true)
+                    (nodeOp:(NB, N, Int) => NB, edgeOp:(EB, E, Int, Int) => EB) = {
     gfold[NB,EB](startNode, nz, ez, true, avoidLoop)(nodeOp, edgeOp)
   }
 
-  def foldBFS[NB,EB](startNode:Node[N], nz:NB, ez: EB, avoidLoop:Boolean = true)(nodeOp:(NB, N) => NB, edgeOp:(EB, E) => EB) = {
+  def foldBFS[NB,EB](startNode:Node[N], nz:NB, ez: EB, avoidLoop:Boolean = true)
+                    (nodeOp:(NB, N, Int) => NB, edgeOp:(EB, E, Int, Int) => EB) = {
     gfold[NB,EB](startNode, nz, ez, false, avoidLoop)(nodeOp, edgeOp)
   }
 
-  def foldNodesDFS[NB](startNode:Node[N], nz:NB, avoidLoop:Boolean = true)(nodeOp:(NB, N) => NB) = {
-    gfold(startNode, nz, Unit, true, avoidLoop)(nodeOp, (x,y) => Unit)._1
+  def foldNodesDFS[NB](startNode:Node[N], nz:NB, avoidLoop:Boolean = true)
+                      (nodeOp:(NB, N, Int) => NB) = {
+    gfold(startNode, nz, Unit, true, avoidLoop)(nodeOp, (x,y,f,t) => Unit)._1
   }
 
-  def foldNodesBFS[NB](startNode:Node[N], nz:NB, avoidLoop:Boolean = true)(nodeOp:(NB, N) => NB) = {
-    gfold(startNode, nz, Unit, false, avoidLoop)(nodeOp, (x,y) => Unit)._1
+  def foldNodesBFS[NB](startNode:Node[N], nz:NB, avoidLoop:Boolean = true)(nodeOp:(NB, N, Int) => NB) = {
+    gfold(startNode, nz, Unit, false, avoidLoop)(nodeOp, (x,y,f,t) => Unit)._1
   }
 
-  def foldEdgesDFS[NE](startNode:Node[N], ne:NE, avoidLoop:Boolean = true)(edgeOp:(NE, E) => NE) = {
-    gfold(startNode, Unit, ne, true, avoidLoop)((x,y) => Unit,edgeOp)._2
+  def foldEdgesDFS[NE](startNode:Node[N], ne:NE, avoidLoop:Boolean = true)(edgeOp:(NE, E, Int, Int) => NE) = {
+    gfold(startNode, Unit, ne, true, avoidLoop)((x,y,i) => Unit,edgeOp)._2
   }
 
-  private def traverse[NP,EP](node:Node[N], nodeF:(N => NP), edgeF:(E => EP),
+  private def traverse[NP,EP](node:Node[N], nodeF:((N,Int) => NP), edgeF:((E, Int, Int) => EP),
                               isDFS:Boolean = true, avoidLoop:Boolean = true) = {
-
     if(nodes.contains(node.id)) {
       var nodes2visit = List(node.id)
       var edges2Visit = List.empty[(Int,Int)]
@@ -155,7 +168,7 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
 
       var res = DGraph.empty[NP,EP]
 
-      while(!nodes2visit.isEmpty || !edges2Visit.isEmpty) {
+      while(nodes2visit.nonEmpty || edges2Visit.nonEmpty) {
 
         val currentNode = nodes2visit.headOption
        // println(s"Current Node: $currentNode")
@@ -175,7 +188,7 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
         if(currentNode.isDefined) {
           //println(s"adding Node $currentNode")
           visitedNodes.add(currentNode.get)
-          res = res.addNode(Node(nodeF(nodes(currentNode.get).value), currentNode.get))
+          res = res.addNode(Node(nodeF(nodes(currentNode.get).value, currentNode.get), currentNode.get))
         }
 
         //
@@ -190,7 +203,7 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
           val currentEdge = edges2Visit.head
           //println(s"adding edge $currentEdge")
           visitedEdges.add(currentEdge)
-          res = res.addEdge(DEdge(edgeF(edges(currentEdge).value), currentEdge._1, currentEdge._2)).get
+          res = res.addEdge(DEdge(edgeF(edges(currentEdge).value, currentEdge._1, currentEdge._2), currentEdge._1, currentEdge._2)).get
           if(currentNode.isDefined) {
             if(isDFS)
               edges2Visit = edgeOut.map(o => (currentNode.get, o)) ::: edges2Visit.tail
@@ -212,6 +225,9 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
     }
     else throw new NoSuchElementException("The node is not part of the graph")
   }
+
+  private def nodeIden(n:N, i:Int):N = n
+  private def edgeIden(e:E, f:Int, t:Int):E = e
 
 }
 

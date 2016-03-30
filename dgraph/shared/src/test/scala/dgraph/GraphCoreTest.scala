@@ -108,11 +108,11 @@ object DGraphCoreTest extends TestSuite {
           --("e2")->Nd("n3"))
       )
 
-      val gp = g.mapDFS(g.roots.head, x => x, y => y)
+      val gp = g.mapDFS(g.roots.head, (x,i) => x, (y,f,t) => y)
       assert(g== gp)
 
       var counter = 0
-      val gp1 = g.mapDFS(g.roots.head, x => {counter +=1; (x,counter)}, y => y)
+      val gp1 = g.mapDFS(g.roots.head, (x,i) => {counter +=1; (x,counter)}, (y, f,t) => y)
       val nds = gp1.nodes.map(_._2).toList
       val n0 = nds.filter(_.value._1 == "n0").head
       val n1 = nds.filter(_.value._1 == "n1").head
@@ -138,12 +138,12 @@ object DGraphCoreTest extends TestSuite {
           --("e2")->Nd("n3"))
       )
 
-      val gp = g.mapBFS(g.roots.head, x => x, y => y)
+      val gp = g.mapBFS(g.roots.head, (x, i) => x, (y, f, t) => y)
       assert(g== gp)
 
       var counter = 0
       println(counter)
-      val gp1 = g.mapBFS(g.roots.head, x => {counter +=1; println((x,counter)); (x,counter)}, y => y)
+      val gp1 = g.mapBFS(g.roots.head, (x,i) => {counter +=1; println((x,counter)); (x,counter)}, (y,f,t) => y)
       val nds = gp1.nodes.map(_._2).toList
       val n0 = nds.filter(_.value._1 == "n0").head
       val n1 = nds.filter(_.value._1 == "n1").head
@@ -169,13 +169,13 @@ object DGraphCoreTest extends TestSuite {
           --("e2")->Nd("n3"))
       )
 
-      val concatDFS = g.foldDFS(g.roots.head,"","")((x,y) => x + y, (x,y) => x + y)
-      val concatBFS = g.foldBFS(g.roots.head,"","")((x,y) => x + y, (x,y) => x + y)
+      val concatDFS = g.foldDFS(g.roots.head,"","")((x,y,i) => x + y, (x,y,f,t) => x + y)
+      val concatBFS = g.foldBFS(g.roots.head,"","")((x,y,i) => x + y, (x,y,f,t) => x + y)
       assert(concatDFS._1 == "n0n1n2n4n3")
-      assert(concatDFS._1 == g.foldNodesDFS(g.roots.head,"")((x,y) => x + y))
+      assert(concatDFS._1 == g.foldNodesDFS(g.roots.head,"")((x,y,i) => x + y))
 
       assert(concatBFS._1 == "n0n1n2n3n4")
-      assert(concatBFS._1 == g.foldNodesBFS(g.roots.head,"")((x,y) => x + y))
+      assert(concatBFS._1 == g.foldNodesBFS(g.roots.head,"")((x,y,i) => x + y))
 
     }
   }
