@@ -6,9 +6,9 @@ import scala.annotation.tailrec
 import scala.collection.immutable.TreeMap
 import scala.collection.mutable
 
-case class Node[N](value:N, id:Int)
+case class Node[+N](value:N, id:Int)
 
-case class DEdge[E](value:E, from:Int, to:Int){
+case class DEdge[+E](value:E, from:Int, to:Int){
   def getID = (from,to)
 }
 
