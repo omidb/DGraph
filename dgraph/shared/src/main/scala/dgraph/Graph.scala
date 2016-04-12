@@ -15,7 +15,7 @@ case class DEdge[+E](value:E, from:Int, to:Int){
 case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[E]],
                         inMap:Map[Int,IndexedSeq[Int]], outMap:Map[Int,IndexedSeq[Int]]) {
 
-  lazy val roots = inMap.filter(_._2.size == 0).map { case(ky,mp) => nodes(ky) }
+  lazy val roots = inMap.filter(_._2.isEmpty).map { case(ky,mp) => nodes(ky) }
 
 
   def childs(n:Int):IndexedSeq[Node[N]] = if(outMap.contains(n)) outMap(n).map(nodes(_)) else IndexedSeq.empty
@@ -50,6 +50,16 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
     } else None
   }
 
+  def addNode(nodeContent:N, edgeContent:E, from:Int):DGraph[N,E] = {
+    val newNodeKey = nodes.keys.max + 1
+    val newGraph = addNode(Node(nodeContent, newNodeKey))
+    newGraph.copy(
+      edges = newGraph.edges.updated((from, newNodeKey), DEdge(edgeContent, from, newNodeKey)),
+      inMap = newGraph.inMap.updated(newNodeKey, newGraph.inMap(newNodeKey) :+ from),
+      outMap = newGraph.outMap.updated(from, newGraph.outMap(from) :+ newNodeKey)
+    )
+  }
+
   def updated(from: Node[N], to: Node[N], edge:DEdge[E]): DGraph[N, E] = {
     val q0 = this.copy(nodes = this.nodes ++ List((from.id,from), (to.id,to)))
 
@@ -71,27 +81,27 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
 //    mtch(q1)
 //  }
 
-  def containsNode(n:N):Boolean = nodes.values.filter(_.value == n).size > 0
-  def containsEdge(e:E):Boolean = edges.values.filter(_.value == e).size > 0
+  def containsNode(n:N):Boolean = nodes.values.exists(_.value == n)
+  def containsEdge(e:E):Boolean = edges.values.exists(_.value == e)
   //def contains(query:DGraph[NodeMatchLike[N], EdgeMatchLike[E]]):Boolean = GraphMatch.mtch(this,query).size > 0
   def contains(query:QNodeLike[NodeMatchLike[N], EdgeMatchLike[E]]):Boolean = {
    val q = DGraph.from(query)
-   GraphMatch.mtch(this, q).size > 0
+   GraphMatch.mtch(this, q).nonEmpty
   }
 
   def mapByNodes[M](mapper:N => M):DGraph[M, E] = {
-    val newNodes = nodes.map { case(i,n) => (n.id -> Node(mapper(n.value), n.id))}
+    val newNodes = nodes.map { case(i,n) => n.id -> Node(mapper(n.value), n.id)}
     DGraph[M, E](newNodes, this.edges, this.inMap, this.outMap)
   }
 
   def mapByEdges[EE](mapper:E => EE):DGraph[N, EE] = {
-    val newEdges = edges.map { case((f,t),e) => ((f,t) -> DEdge(mapper(e.value), f, t))}
+    val newEdges = edges.map { case((f,t),e) => (f,t) -> DEdge(mapper(e.value), f, t)}
     DGraph[N, EE](this.nodes, newEdges, this.inMap, this.outMap)
   }
 
   def map[M,EE](nodeMapper: N => M , edgeMapper: E => EE) = {
-    val newNodes = nodes.map { case(i,n) => (n.id -> Node(nodeMapper(n.value), n.id))}
-    val newEdges = edges.map { case((f,t),e) => ((f,t) -> DEdge(edgeMapper(e.value), f, t))}
+    val newNodes = nodes.map { case(i,n) => n.id -> Node(nodeMapper(n.value), n.id)}
+    val newEdges = edges.map { case((f,t),e) => (f,t) -> DEdge(edgeMapper(e.value), f, t)}
     DGraph[M, EE](newNodes, newEdges, this.inMap, this.outMap)
   }
 
@@ -199,7 +209,7 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
           else
             outs.toList
 
-        if(!edges2Visit.isEmpty){
+        if(edges2Visit.nonEmpty){
           val currentEdge = edges2Visit.head
           //println(s"adding edge $currentEdge")
           visitedEdges.add(currentEdge)

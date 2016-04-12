@@ -40,6 +40,30 @@ object DGraphCoreTest extends TestSuite {
 
     }
 
+    'createIn {
+      import DGraphDSL._
+      val g = DGraph.from[String,String](
+        Nd("n0",
+          --("e0")->Nd("n1"),
+          --("e1")->Nd("n2"),
+          --("e2")->Nd("n3"))
+      )
+      val n3 = g.filterNodes(_ == "n3").head
+      val g2 = g.addNode("n4","e3",n3.id)
+
+      assert(g2.nodes(0) == Node("n0", 0))
+      assert(g2.nodes(1) == Node("n1", 1))
+      assert(g2.nodes(2) == Node("n2", 2))
+      assert(g2.nodes(3) == Node("n3", 3))
+      assert(g2.nodes(4) == Node("n4", 4))
+
+      assert(g2.edges((0,1)) == DEdge("e0", 0, 1))
+      assert(g2.edges((0,2)) == DEdge("e1", 0, 2))
+      assert(g2.edges((0,3)) == DEdge("e2", 0, 3))
+      assert(g2.edges((3,4)) == DEdge("e3", 3, 4))
+
+    }
+
     'create2 {
       import DGraphDSL._
       val g = DGraph.from[String,String](
@@ -144,7 +168,7 @@ object DGraphCoreTest extends TestSuite {
       var counter = 0
       println(counter)
       val gp1 = g.mapBFS(g.roots.head, (x,i) => {counter +=1; println((x,counter)); (x,counter)}, (y,f,t) => y)
-      val nds = gp1.nodes.map(_._2).toList
+      val nds = gp1.nodes.values.toList
       val n0 = nds.filter(_.value._1 == "n0").head
       val n1 = nds.filter(_.value._1 == "n1").head
       val n2 = nds.filter(_.value._1 == "n2").head
