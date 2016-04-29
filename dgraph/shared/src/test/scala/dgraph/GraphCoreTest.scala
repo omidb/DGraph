@@ -49,7 +49,7 @@ object DGraphCoreTest extends TestSuite {
           --("e2")->Nd("n3"))
       )
       val n3 = g.filterNodes(_ == "n3").head
-      val g2 = g.addNode("n4","e3",n3.id)
+      val g2 = g.addNode("n4","e3",n3.id)._2
 
       assert(g2.nodes(0) == Node("n0", 0))
       assert(g2.nodes(1) == Node("n1", 1))

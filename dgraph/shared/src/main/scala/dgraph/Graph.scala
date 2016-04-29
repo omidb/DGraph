@@ -25,38 +25,45 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
     else IndexedSeq.empty
   }
 
-  def addNode(node:Node[N]):DGraph[N,E] = {
-    this.copy(
-      nodes = nodes.updated(node.id,node),
-      inMap = inMap.updated(node.id,inMap.getOrElse(node.id, IndexedSeq.empty[Int])),
-      outMap = outMap.updated(node.id,outMap.getOrElse(node.id, IndexedSeq.empty[Int]))
+  def addNode(node:Node[N]):(Node[N],DGraph[N,E]) = {
+    (node,
+      this.copy(
+        nodes = nodes.updated(node.id,node),
+        inMap = inMap.updated(node.id,inMap.getOrElse(node.id, IndexedSeq.empty[Int])),
+        outMap = outMap.updated(node.id,outMap.getOrElse(node.id, IndexedSeq.empty[Int]))
+      )
     )
   }
 
-  def addNode(value:N):DGraph[N,E] = {
-    val maxKey = nodes.keys.max
-    addNode(Node(value,maxKey+1))
+  def addNode(value:N):(Node[N],DGraph[N,E]) = {
+    val maxKey = if(nodes.keys.nonEmpty) nodes.keys.max else -1
+    val node = Node(value, maxKey + 1)
+    addNode(node)
   }
 
-  def addEdge(edge:DEdge[E]):Option[DGraph[N,E]] = {
-    if(nodes.contains(edge.from) && nodes.contains(edge.to)) {
+  def addEdge(edge:DEdge[E]):Option[(DEdge[E], DGraph[N,E])] = {
+    if (nodes.contains(edge.from) && nodes.contains(edge.to)) {
       Some(
-        this.copy(
-          edges = edges.updated((edge.from, edge.to), edge),
-          inMap = inMap.updated(edge.to, inMap(edge.to) :+ edge.from),
-          outMap = outMap.updated(edge.from, outMap(edge.from) :+ edge.to)
+        (edge,
+          this.copy[N,E](
+            edges = edges.updated((edge.from, edge.to), edge),
+            inMap = inMap.updated(edge.to, inMap(edge.to) :+ edge.from),
+            outMap = outMap.updated(edge.from, outMap(edge.from) :+ edge.to)
+          )
         )
       )
     } else None
   }
 
-  def addNode(nodeContent:N, edgeContent:E, from:Int):DGraph[N,E] = {
-    val newNodeKey = nodes.keys.max + 1
-    val newGraph = addNode(Node(nodeContent, newNodeKey))
-    newGraph.copy(
-      edges = newGraph.edges.updated((from, newNodeKey), DEdge(edgeContent, from, newNodeKey)),
-      inMap = newGraph.inMap.updated(newNodeKey, newGraph.inMap(newNodeKey) :+ from),
-      outMap = newGraph.outMap.updated(from, newGraph.outMap(from) :+ newNodeKey)
+  def addNode(nodeContent:N, edgeContent:E, from:Int):(Node[N], DGraph[N,E]) = {
+    val newNodeKey = if(nodes.nonEmpty) nodes.keys.max + 1 else 0
+    val (node,newGraph) = addNode(Node(nodeContent, newNodeKey))
+    (node,
+      newGraph.copy(
+        edges = newGraph.edges.updated((from, newNodeKey), DEdge(edgeContent, from, newNodeKey)),
+        inMap = newGraph.inMap.updated(newNodeKey, newGraph.inMap(newNodeKey) :+ from),
+        outMap = newGraph.outMap.updated(from, newGraph.outMap(from) :+ newNodeKey)
+      )
     )
   }
 
@@ -198,7 +205,7 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
         if(currentNode.isDefined) {
           //println(s"adding Node $currentNode")
           visitedNodes.add(currentNode.get)
-          res = res.addNode(Node(nodeF(nodes(currentNode.get).value, currentNode.get), currentNode.get))
+          res = res.addNode(Node(nodeF(nodes(currentNode.get).value, currentNode.get), currentNode.get))._2
         }
 
         //
@@ -213,7 +220,7 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
           val currentEdge = edges2Visit.head
           //println(s"adding edge $currentEdge")
           visitedEdges.add(currentEdge)
-          res = res.addEdge(DEdge(edgeF(edges(currentEdge).value, currentEdge._1, currentEdge._2), currentEdge._1, currentEdge._2)).get
+          res = res.addEdge(DEdge(edgeF(edges(currentEdge).value, currentEdge._1, currentEdge._2), currentEdge._1, currentEdge._2)).get._2
           if(currentNode.isDefined) {
             if(isDFS)
               edges2Visit = edgeOut.map(o => (currentNode.get, o)) ::: edges2Visit.tail

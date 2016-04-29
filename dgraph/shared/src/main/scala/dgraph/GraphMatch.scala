@@ -46,7 +46,7 @@ case class Branch[N](solution:Map[Node[NodeMatchLike[N]], Node[N]],
     for((index, n) <- q.nodes) {
       val x = solution(n)
       if(!gr.nodes.contains(x.id)) {
-        gr = gr.addNode(x)
+        gr = gr.addNode(x)._2
       }
     }
     (gr, solution, edgeMap.toMap)
