@@ -6,14 +6,17 @@ import scala.annotation.tailrec
 import scala.collection.immutable.TreeMap
 import scala.collection.mutable
 
-case class Node[+N](value:N, id:Int)
+@SerialVersionUID(1L)
+case class Node[+N](value:N, id:Int) extends Serializable
 
-case class DEdge[+E](value:E, from:Int, to:Int){
+@SerialVersionUID(1L)
+case class DEdge[+E](value:E, from:Int, to:Int) extends Serializable{
   def getID = (from,to)
 }
 
+@SerialVersionUID(1L)
 case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[E]],
-                        inMap:Map[Int,IndexedSeq[Int]], outMap:Map[Int,IndexedSeq[Int]]) {
+                        inMap:Map[Int,IndexedSeq[Int]], outMap:Map[Int,IndexedSeq[Int]]) extends Serializable{
 
   lazy val roots = inMap.filter(_._2.isEmpty).map { case(ky,mp) => nodes(ky) }
 
