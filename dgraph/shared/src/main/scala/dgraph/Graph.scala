@@ -25,6 +25,40 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
     else IndexedSeq.empty
   }
 
+  def removeNode(node: Node[N]):DGraph[N, E] = {
+    this.copy(
+      nodes = this.nodes.filterNot{case(id, v) => node == v && node.id == id},
+      inMap = this.inMap.filterNot(_._1 == node.id).map{case(id, ins) => id -> ins.filterNot(_ == node.id)},
+      outMap = this.outMap.filterNot(_._1 == node.id).map{case(id, outs) => id -> outs.filterNot(_ == node.id)}
+    )
+  }
+
+  def removeNode(nodeId: Int):DGraph[N, E] = {
+    var g = this
+    this.nodes.filter(_._1 == nodeId).foreach(i => g = removeNode(i._2))
+    g.copy()
+  }
+
+  def removeEdge(edge: DEdge[E]):DGraph[N, E] = {
+    this.copy(
+      edges = this.edges.filterNot{case((f,t),e) => f == edge.from && t == edge.to && e == edge},
+      inMap = {
+        val ins = this.inMap(edge.to)
+        this.inMap.updated(edge.to, ins.filterNot(_ == edge.from))
+      },
+      outMap = {
+        val outs = this.outMap(edge.from)
+        this.outMap.updated(edge.from, outs.filterNot(_ == edge.to))
+      }
+    )
+  }
+
+  def removeEdge(from:Int, to:Int):DGraph[N, E] = {
+    var g = this
+    this.edges.filter(_._1 == (from,to)).foreach(i => g = g.removeEdge(i._2))
+    g.copy()
+  }
+
   def addNode(node:Node[N]):(Node[N],DGraph[N,E]) = {
     (node,
       this.copy(
