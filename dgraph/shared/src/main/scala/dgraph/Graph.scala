@@ -31,6 +31,7 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
   def removeNode(node: Node[N]):DGraph[N, E] = {
     this.copy(
       nodes = this.nodes.filterNot{case(id, v) => node == v && node.id == id},
+      edges = TreeMap(this.edges.toList.filterNot(e => e._1._1 == node.id || e._1._2 == node.id):_*),
       inMap = this.inMap.filterNot(_._1 == node.id).map{case(id, ins) => id -> ins.filterNot(_ == node.id)},
       outMap = this.outMap.filterNot(_._1 == node.id).map{case(id, outs) => id -> outs.filterNot(_ == node.id)}
     )
