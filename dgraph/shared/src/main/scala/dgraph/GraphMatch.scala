@@ -74,12 +74,14 @@ object GraphMatch {
               branches = branches.enqueue(br.copy[N](goals = Map[Node[N], Node[NodeMatchLike[N]]](n -> r))))
         }
 
-        while (!branches.isEmpty) {
+        while (branches.nonEmpty) {
           val (br, newQ) = branches.dequeue
           branches = newQ
-          if (br.goals.size == 0) localFinalSolutions = localFinalSolutions.enqueue(br)
+          if (br.goals.isEmpty)
+            localFinalSolutions = localFinalSolutions.enqueue(br)
 
           else {
+
             val (gNode, qNode) = br.goals.head
             val br1 = br.copy(goals = br.goals.tail)
             if (br1.solution.contains(qNode) && br1.solution(qNode) == gNode)
@@ -89,9 +91,12 @@ object GraphMatch {
 
               val goalChilds = q.childs(qNode.id).zip(q.childsEdges(qNode.id))
               val perms = qNode.value match {
-                case NodeMatchAND(_) => g.childs(gNode.id).zip(g.childsEdges(gNode.id)).toList.combinations(goalChilds.size).toList
+                case NodeMatchAND(_) => g.childs(gNode.id).zip(g.childsEdges(gNode.id)).toList
+                    .combinations(goalChilds.size).toList
+                    .flatMap(comb => comb.permutations.toList)
                 case NodeMatchOR(_) => g.childs(gNode.id).zip(g.childsEdges(gNode.id)).toList.map(List(_))
               }
+
               val tupList = qNode.value match {
                 case NodeMatchAND(_) => perms.map(x => x.zip(goalChilds))
                 case NodeMatchOR(_) => perms.flatMap(x => goalChilds.map(y => x.zip(List(y))))
@@ -116,16 +121,22 @@ object GraphMatch {
 
 
 
-  private def childsMatch[N,E](tupList:List[List[((Node[N], DEdge[E]), (Node[NodeMatchLike[N]], DEdge[EdgeMatchLike[E]]))]], br:Branch[N]) = {
-    for(tup <- tupList) yield {
-      if(tup.forall(x => singleMatch(x._1._1,x._2._1,x._1._2,x._2._2,br))) {
+  private def childsMatch[N,E](tupList:List[List[((Node[N], DEdge[E]), (Node[NodeMatchLike[N]], DEdge[EdgeMatchLike[E]]))]],
+                               br:Branch[N]) = {
+    for (tup <- tupList) yield {
+
+
+
+      if (tup.forall(x => singleMatch(x._1._1, x._2._1, x._1._2, x._2._2)) &&
+        //redunduncy check
+        tup.forall(x => (!br.goals.contains(x._1._1)) || (br.goals.contains(x._1._1) && br.goals(x._1._1) == x._2._1))){
         val newGoals = br.goals ++ tup.filter(xy => !br.goals.contains(xy._1._1)).map(xy => xy._1._1 -> xy._2._1)
         Some(br.copy(goals = newGoals))
       } else None
     }
   }
 
-  private def singleMatch[N,E](b:Node[N], B:Node[NodeMatchLike[N]], e:DEdge[E], E:DEdge[EdgeMatchLike[E]],br:Branch[N]) = {
+  private def singleMatch[N,E](b:Node[N], B:Node[NodeMatchLike[N]], e:DEdge[E], E:DEdge[EdgeMatchLike[E]]) = {
     if(B.value.eval(b.value) &&
       E.value.eval(e.value)) true
     else false
