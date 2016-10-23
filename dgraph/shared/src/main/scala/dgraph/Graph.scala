@@ -150,6 +150,12 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
     DGraph[M, EE](newNodes, newEdges, this.inMap, this.outMap)
   }
 
+  def map[M,EE](nodeMapper: (Int, N) => M , edgeMapper: ((Int, Int), E) => EE) = {
+    val newNodes = nodes.map { case(i,n) => n.id -> Node(nodeMapper(i, n.value), n.id)}
+    val newEdges = edges.map { case((f,t),e) => (f,t) -> DEdge(edgeMapper((f,t), e.value), f, t)}
+    DGraph[M, EE](newNodes, newEdges, this.inMap, this.outMap)
+  }
+
   def filterNodes(nf: N => Boolean) = nodes.values.filter(x => nf(x.value))
   def filterEdges(ef: E => Boolean) = edges.values.filter(x => ef(x.value))
   def filter(query:DGraph[NodeMatchLike[N], EdgeMatchLike[E]]):List[DGraph[N,E]] = {
