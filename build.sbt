@@ -4,7 +4,7 @@ import com.typesafe.sbt.pgp.PgpKeys._
 
 val commonSettings = Seq(
   organization := "com.github.omidb",
-  version := "0.1.0-SNAPSHOT",
+  version := "0.1.1-SNAPSHOT",
   scalaVersion := "2.11.6",
   scalacOptions ++= Seq("-unchecked", "-feature", "-deprecation", "-encoding", "utf8"),
   testFrameworks += new TestFramework("utest.runner.Framework"),
