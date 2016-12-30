@@ -139,6 +139,34 @@ object DGraphCoreTest extends TestSuite {
 //      assert(res2.size == 0)
     }
 
+    'matchingAndExtract {
+      import DGraphDSL._
+
+      case class SimpleExtract(n0:String, n3:String, e3:String)
+
+      val g = DGraph.from[String,String](
+        Nd("n0",
+          --("e0")->Nd("n1"),
+          --("e1")->Nd("n2"),
+          --("e2")->Nd("n3",
+            --("e3")->Nd("n4")))
+      )
+
+      val q2 = query2[String, String, SimpleExtract](
+        <-&(n => n == "n0", (n, p) => p.copy(n0 = n),
+          --?>(_ == "e2", (e,p) => p,
+            <-&(_ == "n3", (n, p) => p.copy(n3 = n),
+              --?>(_ == "e3", (e,p) => p.copy(e3 = e), <-&(_ == "n4",(n,p) => p))))
+        )
+      )
+
+
+      val (q,ed) = q2.unzip
+      val res = extract(g, SimpleExtract("", "", ""), q, ed)
+      println(res.head._2)
+      assert(res.head._2 == SimpleExtract("n0", "n3", "e3"))
+    }
+
     'traverseDFS {
       import DGraphDSL._
       val g = DGraph.from[String,String](

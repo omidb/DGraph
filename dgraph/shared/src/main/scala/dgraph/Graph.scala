@@ -290,6 +290,20 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
   private def nodeIden(n:N, i:Int):N = n
   private def edgeIden(e:E, f:Int, t:Int):E = e
 
+
+  def unzip[N1, N2, E1, E2](implicit
+                            ev1: N <:< (N1, N2),
+                            ev2: E <:< (E1, E2)
+                           ): (DGraph[N1, E1], DGraph[N2, E2]) = {
+    val nds1 = nodes.map(n => n._1 -> Node(n._2.value._1, n._2.id))
+    val nds2 = nodes.map(n => n._1 -> Node(n._2.value._2, n._2.id))
+
+    val eds1 = edges.map(e => e._1 -> DEdge(e._2.value._1, e._2.from, e._2.to))
+    val eds2 = edges.map(e => e._1 -> DEdge(e._2.value._2, e._2.from, e._2.to))
+
+    (this.copy(nodes = nds1, edges = eds1), this.copy(nodes = nds2, edges = eds2))
+  }
+
 }
 
 trait HalfEdgeLike[+E,+N] extends Product with Serializable
@@ -325,6 +339,18 @@ object DGraphDSL {
 
   implicit def tupConvert33[N, E](tup: (N, String)) = QNodeMarker(tup._1, tup._2, EmptyHalfEdge)
 
+//  implicit class grapTuple[N1, N2, E1, E2](tupGraph:DGraph[(N1, N2), (E1, E2)]) {
+//    def unzip = {
+//      val nds1 = tupGraph.nodes.map(n => n._1 -> Node(n._2.value._1, n._2.id))
+//      val nds2 = tupGraph.nodes.map(n => n._1 -> Node(n._2.value._2, n._2.id))
+//
+//      val eds1 = tupGraph.edges.map(e => e._1 -> DEdge(e._2.value._1, e._2.from, e._2.to))
+//      val eds2 = tupGraph.edges.map(e => e._1 -> DEdge(e._2.value._2, e._2.from, e._2.to))
+//
+//      (tupGraph.copy(nodes = nds1, edges = eds1), tupGraph.copy(nodes = nds2, edges = eds2))
+//    }
+//  }
+
 
   def Nd[N, E](n: N, edges: HalfEdgeLike[E, N]*) = QNode[N, E](n, edges: _*)
 
@@ -332,15 +358,69 @@ object DGraphDSL {
 
   def Ref[N, E](marker: String, edges: HalfEdgeLike[E, N]*) = QNodeRef[N, E](marker, edges: _*)
 
+  case class Extractor[N,P](eval:(N,P) => P)
 
   def query[N, E](qNodes: QNodeLike[NodeMatchLike[N], EdgeMatchLike[E]]): DGraph[NodeMatchLike[N], EdgeMatchLike[E]] =
     DGraph.from(qNodes)
 
-  def <&[N, E](n: N => Boolean, edges: HalfEdgeLike[EdgeMatch[E], NodeMatchLike[N]]*) =
-    QNode[NodeMatchLike[N], EdgeMatch[E]](NodeMatchAND(n), edges: _*)
+  def queryAndExtract[N, E, P](qNodes: QNodeLike[(NodeMatchLike[N], Extractor[N,P]), (EdgeMatchLike[E], Extractor[E,P])],
+                               graph: DGraph[N, E], p:P) = {
+    val q2 = DGraph.from(qNodes)
+    val (q, ed) = q2.unzip
+    extract(graph, p, q, ed)
+  }
+
+  def query2[N, E, P](qNodes: QNodeLike[(NodeMatchLike[N], Extractor[N,P]), (EdgeMatchLike[E], Extractor[E,P])]) =
+    DGraph.from(qNodes)
+
+  def extract[N, E, P](g:DGraph[N, E], extractP:P,
+                       q:DGraph[NodeMatchLike[N], EdgeMatchLike[E]],
+                       ed:DGraph[Extractor[N, P], Extractor[E, P]]) = {
+
+    val qExtractNodes = ed.nodes.map(n => n._1 -> n._2.value).toList
+    val qExtractEdges = ed.edges.map(e => e._1 -> e._2.value).toList
+
+
+    val gm = GraphMatch.mtch(g, q).map(m => {
+      var p = extractP
+      val (_, ndMap, edgeMap) = m.getMatchedGraph(g, q)
+      val gr = DGraph.from(
+        ndMap.values.map(n => n.id -> n).toMap,
+        TreeMap(edgeMap.values.map(e => (e.from, e.to) -> e).toList: _*))
+
+      qExtractNodes.foreach {
+        case(nid, fn) =>
+          val nd = ndMap.find(_._1.id == nid).get._2
+          p = fn.eval(nd.value, p)
+      }
+
+      qExtractEdges.foreach {
+        case(eid, fn) =>
+          val ed = edgeMap.find(em => (em._1.from, em._1.to) == eid).get._2
+          p = fn.eval(ed.value, p)
+      }
+      (gr, p)
+    })
+
+    gm.toList
+  }
+
 
   def -?>[N, E](e: E => Boolean, q: QNodeLike[NodeMatchLike[N], EdgeMatch[E]]): HalfEdgeLike[EdgeMatch[E], NodeMatchLike[N]] =
     HalfEdge[EdgeMatch[E], NodeMatchLike[N]](EdgeMatch(e), q)
+
+  def <&[N, E](n: N => Boolean, edges: HalfEdgeLike[EdgeMatch[E], NodeMatchLike[N]]*) =
+    QNode[NodeMatchLike[N], EdgeMatch[E]](NodeMatchAND(n), edges: _*)
+
+
+  def --?>[N, E, P](e: E => Boolean, extract:(E, P) => P,
+                    q: QNodeLike[(NodeMatchLike[N], Extractor[N,P]), (EdgeMatch[E], Extractor[E,P])]):
+    HalfEdgeLike[(EdgeMatch[E], Extractor[E,P]), (NodeMatchLike[N], Extractor[N,P])] =
+    HalfEdge[(EdgeMatch[E], Extractor[E,P]), (NodeMatchLike[N], Extractor[N,P])]((EdgeMatch(e), Extractor(extract)), q)
+
+  def <-&[N, E, P](n: N => Boolean, extract:(N, P) => P,
+                   edges: HalfEdgeLike[(EdgeMatch[E], Extractor[E, P]), (NodeMatchLike[N], Extractor[N, P])]*) =
+    QNode[(NodeMatchLike[N], Extractor[N, P]), (EdgeMatch[E], Extractor[E, P])]((NodeMatchAND(n), Extractor(extract)), edges: _*)
 
   def <#[N, E](marker: String, edges: HalfEdgeLike[EdgeMatch[E], NodeMatchLike[N]]*) =
     QNodeRef[NodeMatchLike[N], EdgeMatch[E]](marker, edges: _*)
@@ -359,6 +439,7 @@ object DGraphDSL {
   def anyEdge[E](e: E): Boolean = true
 
 }
+
 
 object DGraph {
 
