@@ -102,11 +102,20 @@ object DGraphCoreTest extends TestSuite {
                     --("e3")->(Ref("mrk1"))))
       )
 
+      val g2 = DGraph.from[String,String](
+        Nd("n0",
+          --("e0")->Nd("n1"),
+          --("e1")->Nd("n2"),
+          --("e2")->Nd("n3",
+            --("e3")->Nd("n4")))
+      )
+
       val q = query[String,String](
         <&(_ == "n0",
             -?>(_ == "e0", <&(_ == "n1"))
         )
       )
+
 
       val q1 = query[String,String](
         <&(t => false,
@@ -114,11 +123,20 @@ object DGraphCoreTest extends TestSuite {
         )
       )
 
+      val q2 = query[String,String](
+        <&(n => n == "n0",
+          -?>(_ == "e2",
+            <&(_ == "n3", -?>(_ == "e3", <&(_ == "n4"))))
+        )
+      )
+
       val res = g.filter(q)
 
       val res2 = g filter q1
 
-      assert(res2.size == 0)
+      assert(g2.filter(q2).nonEmpty)
+
+//      assert(res2.size == 0)
     }
 
     'traverseDFS {

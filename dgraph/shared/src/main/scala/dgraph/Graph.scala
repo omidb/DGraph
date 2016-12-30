@@ -299,56 +299,64 @@ case object EmptyHalfEdge extends HalfEdgeLike[Nothing,Nothing]
 
 trait QNodeLike[+N,+E] extends Product with Serializable
 
-case class QNode[N,E](head:N ,out:HalfEdgeLike[E,N]*) extends QNodeLike[N,E]
+case class QNode[N,E](head:N, out:HalfEdgeLike[E,N]*) extends QNodeLike[N,E]
 
 case class QNodeMarker[N,E](head:N, marker:String, out:HalfEdgeLike[E,N]*) extends QNodeLike[N,E]
 
 case class QNodeRef[N,E](ref:String, out:HalfEdgeLike[E,N]*) extends QNodeLike[N,E]
 
-
 object DGraphDSL {
 
-  case class PEdge[E](e:E) {
-    def ->[N](qNode: QNodeLike[N,E]) = HalfEdge(e, qNode)
+  case class PEdge[E](e: E) {
+    def ->[N](qNode: QNodeLike[N, E]) = HalfEdge(e, qNode)
   }
 
 
-  def --[E](ed:E):PEdge[E] = PEdge(ed)
+  def --[E](ed: E): PEdge[E] = PEdge(ed)
 
-  case class PEdgeMatch[E](e:E) {
-    def ->[N](qNode: QNodeLike[NodeMatchLike[N],EdgeMatchLike[E]]) = HalfEdge(e, qNode)
+  case class PEdgeMatch[E](e: E) {
+    def ->[N](qNode: QNodeLike[NodeMatchLike[N], EdgeMatchLike[E]]) = HalfEdge(e, qNode)
   }
 
 
-  implicit def tupConvert[N,E](tup: (E,QNodeLike[N,E])):HalfEdge[E,N] = HalfEdge(tup._1,tup._2)
-  implicit def tupConvert3[N,E](tup: (N,String,HalfEdgeLike[E,N])) = QNodeMarker(tup._1,tup._2,tup._3)
-  implicit def tupConvert33[N,E](tup: (N,String)) = QNodeMarker(tup._1,tup._2,EmptyHalfEdge)
+  implicit def tupConvert[N, E](tup: (E, QNodeLike[N, E])): HalfEdge[E, N] = HalfEdge(tup._1, tup._2)
 
-  def Nd[N,E](n:N, edges:HalfEdgeLike[E,N]*) = QNode[N,E](n,edges:_*)
-  def NdMark[N,E](n:N, marker:String, edges:HalfEdgeLike[E,N]*) = QNodeMarker[N,E](n,marker, edges:_*)
-  def Ref[N,E](marker:String, edges:HalfEdgeLike[E,N]*) = QNodeRef[N,E](marker, edges:_*)
+  implicit def tupConvert3[N, E](tup: (N, String, HalfEdgeLike[E, N])) = QNodeMarker(tup._1, tup._2, tup._3)
+
+  implicit def tupConvert33[N, E](tup: (N, String)) = QNodeMarker(tup._1, tup._2, EmptyHalfEdge)
 
 
-  def query[N,E](qNodes:QNodeLike[NodeMatchLike[N],EdgeMatchLike[E]]):DGraph[NodeMatchLike[N],EdgeMatchLike[E]] =
-   DGraph.from(qNodes)
+  def Nd[N, E](n: N, edges: HalfEdgeLike[E, N]*) = QNode[N, E](n, edges: _*)
 
-  def -?>[N,E](e:E =>Boolean, q:QNodeLike[NodeMatchLike[N],EdgeMatch[E]]):HalfEdgeLike[EdgeMatchLike[E],NodeMatchLike[N]] =
-    HalfEdge[EdgeMatchLike[E],NodeMatchLike[N]](EdgeMatch(e),q)
+  def NdMark[N, E](n: N, marker: String, edges: HalfEdgeLike[E, N]*) = QNodeMarker[N, E](n, marker, edges: _*)
 
-  def <#[N,E](marker:String, edges:HalfEdgeLike[E,NodeMatchLike[N]]*) = QNodeRef[NodeMatchLike[N],E](marker,edges:_*)
+  def Ref[N, E](marker: String, edges: HalfEdgeLike[E, N]*) = QNodeRef[N, E](marker, edges: _*)
 
-  def <&[N,E](n:N => Boolean, edges:HalfEdgeLike[E,NodeMatchLike[N]]*) = QNode[NodeMatchLike[N],E](NodeMatchAND(n),edges:_*)
 
-  def <&&[N,E](n:N => Boolean, marker:String, edges:HalfEdgeLike[E,NodeMatchLike[N]]*) =
-    QNodeMarker[NodeMatchLike[N],E](NodeMatchAND(n),marker,edges:_*)
+  def query[N, E](qNodes: QNodeLike[NodeMatchLike[N], EdgeMatchLike[E]]): DGraph[NodeMatchLike[N], EdgeMatchLike[E]] =
+    DGraph.from(qNodes)
 
-  def <|[N,E](n:N => Boolean, edges:HalfEdgeLike[E,NodeMatchLike[N]]*) = QNode[NodeMatchLike[N],E](NodeMatchOR(n),edges:_*)
+  def <&[N, E](n: N => Boolean, edges: HalfEdgeLike[EdgeMatch[E], NodeMatchLike[N]]*) =
+    QNode[NodeMatchLike[N], EdgeMatch[E]](NodeMatchAND(n), edges: _*)
 
-  def <||[N,E](n:N => Boolean, marker:String, edges:HalfEdgeLike[E,NodeMatchLike[N]]*) =
-    QNodeMarker[NodeMatchLike[N],E](NodeMatchOR(n),marker,edges:_*)
+  def -?>[N, E](e: E => Boolean, q: QNodeLike[NodeMatchLike[N], EdgeMatch[E]]): HalfEdgeLike[EdgeMatch[E], NodeMatchLike[N]] =
+    HalfEdge[EdgeMatch[E], NodeMatchLike[N]](EdgeMatch(e), q)
 
-  def anyNode[N](n:N):Boolean = true
-  def anyEdge[E](e:E):Boolean = true
+  def <#[N, E](marker: String, edges: HalfEdgeLike[EdgeMatch[E], NodeMatchLike[N]]*) =
+    QNodeRef[NodeMatchLike[N], EdgeMatch[E]](marker, edges: _*)
+
+  def <&&[N, E](n: N => Boolean, marker: String, edges: HalfEdgeLike[EdgeMatch[E], NodeMatchLike[N]]*) =
+    QNodeMarker[NodeMatchLike[N], EdgeMatch[E]](NodeMatchAND(n), marker, edges: _*)
+
+  def <|[N, E](n: N => Boolean, edges: HalfEdgeLike[EdgeMatch[E], NodeMatchLike[N]]*) =
+    QNode[NodeMatchLike[N], EdgeMatch[E]](NodeMatchOR(n), edges: _*)
+
+  def <||[N, E](n: N => Boolean, marker: String, edges: HalfEdgeLike[EdgeMatch[E], NodeMatchLike[N]]*) =
+    QNodeMarker[NodeMatchLike[N], EdgeMatch[E]](NodeMatchOR(n), marker, edges: _*)
+
+  def anyNode[N](n: N): Boolean = true
+
+  def anyEdge[E](e: E): Boolean = true
 
 }
 
