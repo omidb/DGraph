@@ -339,17 +339,6 @@ object DGraphDSL {
 
   implicit def tupConvert33[N, E](tup: (N, String)) = QNodeMarker(tup._1, tup._2, EmptyHalfEdge)
 
-//  implicit class grapTuple[N1, N2, E1, E2](tupGraph:DGraph[(N1, N2), (E1, E2)]) {
-//    def unzip = {
-//      val nds1 = tupGraph.nodes.map(n => n._1 -> Node(n._2.value._1, n._2.id))
-//      val nds2 = tupGraph.nodes.map(n => n._1 -> Node(n._2.value._2, n._2.id))
-//
-//      val eds1 = tupGraph.edges.map(e => e._1 -> DEdge(e._2.value._1, e._2.from, e._2.to))
-//      val eds2 = tupGraph.edges.map(e => e._1 -> DEdge(e._2.value._2, e._2.from, e._2.to))
-//
-//      (tupGraph.copy(nodes = nds1, edges = eds1), tupGraph.copy(nodes = nds2, edges = eds2))
-//    }
-//  }
 
 
   def Nd[N, E](n: N, edges: HalfEdgeLike[E, N]*) = QNode[N, E](n, edges: _*)

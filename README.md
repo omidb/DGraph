@@ -1,8 +1,11 @@
 # DGraph
-An implementation of directed graph with powerful graph matching property
+An implementation of directed graph with powerful graph matching functionality.
 
-**Anything could change in next releases** 
-A graph has two main parts: `Node` and `DEdge`. `Node[N]` contains `id:Int` and a value of type `N` .`DEdge[E]` has `from:Int` and `to:Int` and value of type `E`.
+**Anything could change in the next releases.**
+
+**This library is experimental and NOT production-ready by any means.**
+
+In this library, a graph has two main components: `Node` and `DEdge`. `Node[N]` contains `id:Int` and a value of type `N` .`DEdge[E]` has `from:Int` and `to:Int` and value of type `E`.
  
 Using:
 ```scala
@@ -13,7 +16,7 @@ Using:
 
 ##Create Graph
  
- There are two main ways to create graphs:
+ There are two main ways you can create a graph:
  
  **Using Nodes and Edges**
  
@@ -23,12 +26,12 @@ val edges = TreeMap((0,1) -> DEdge("e0",0,1), (1,0) -> DEdge("e1",1,0), (1,2) ->
 val g:Dgraph[String,String] = DGraph.from(nodes,edges)
 ```
 ###Using a recursive representation
-Using `QNodeLike` and `HalfEdgeLike` you can represent different recursive graph but it will convert to `Dgraph`.
+Using `QNodeLike` and `HalfEdgeLike` you can represent different recursive graphs, but it will get converted to `Dgraph`.
 Following all are `QNodeLike` :
 `QNode` is a simple node
 `QNodeMarker` is a node with a mark for future references
 `QNodeRef` is a references to a marker node
-Following all are `HalfEdgeLike` :
+Following are all `HalfEdgeLike` :
 `HalfEdge` is an edge to a node
 `EmprtHalfEdge` is an empty node and edge
 
@@ -55,8 +58,9 @@ val g2 = DGraph.from[String,String](
 )
 ```
 ##Graph Pattern
-This library provides algorithmes for graph matching. A pattern for matching on graphs is a graph of `DGraph[NodeMatchLike[N],EdgeMatchLike[E]]` which both `NodeMatchLike[N]` and `EdgeMatchLike[E]` contains an eval function of `T=> Boolean`
-Following all are `NodeMatchLike[N]`:
+This library provides algorithms for graph matching. A pattern for matching on graphs is a graph of `DGraph[NodeMatchLike[N],EdgeMatchLike[E]]` which both `NodeMatchLike[N]` and `EdgeMatchLike[E]` contains an eval function of `T=> Boolean`
+The following are all `NodeMatchLike[N]`:
+
 `NodeMatchAND[N]` all the output edge-nodes should be true  `<&()`
 `NodeMatchANDCons[N]` all the output edge-nodes should be true (order is important) `<&()`
 `NodeMatchOR[N]` one of the output edge-nodes is enough to be true `<|()`
@@ -90,7 +94,7 @@ val q = query[String,String](
         )
       )
 ```
-we can perform many operation on it like Scala collections:
+We can perform many operations on it like Scala collections:
 ```scala
  g.containsNode("n0") //check if it contains a node
  g.containsEdge("e0") //check if it contains an edge
@@ -106,4 +110,41 @@ we can perform many operation on it like Scala collections:
  g.filterEdges(_.startWith("e0")) //filtering edges
  g.filter(q) // return List[DGraph[String,String]] of sub-graphs that match the query
 ```
+All the functions above use `GraphMatch.mtch(g, q)` that returns all possible matches between graph `g` and query `q`.
 
+If you want to extract some information from graph and convert it to a record (case class) you can do the following:
+
+Let's say you have the following graph and you want to extract some specific items from it.
+```scala
+ import DGraphDSL._
+
+      case class SimpleExtract(n0:String, n3:String, e3:String)
+
+      val g = DGraph.from[String,String](
+        Nd("n0",
+          --("e0")->Nd("n1"),
+          --("e1")->Nd("n2"),
+          --("e2")->Nd("n3",
+            --("e3")->Nd("n4")))
+      )
+```
+
+We can use `queryAndExtract` that will give us two graphs: A query graph and an Extractor graph
+
+```scala
+
+      val res = queryAndExtract[String, String, SimpleExtract](
+        <-&(n => n == "n0", (n, p) => p.copy(n0 = n),
+          --?>(_ == "e2", (e,p) => p,
+            <-&(_ == "n3", (n, p) => p.copy(n3 = n),
+              --?>(_ == "e3", (e,p) => p.copy(e3 = e), <-&(_ == "n4",(n,p) => p))))
+        ),
+        g, SimpleExtract("", "", "")
+      )
+
+
+      
+      println(res.head._2)
+      assert(res.head._2 == SimpleExtract("n0", "n3", "e3"))
+```
+As you can see, it will extract the information and updates the `SimpleExtract("", "", "")`.
