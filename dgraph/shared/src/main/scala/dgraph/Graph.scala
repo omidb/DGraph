@@ -16,7 +16,8 @@ case class DEdge[+E](value:E, from:Int, to:Int) extends Serializable{
 
 @SerialVersionUID(1L)
 case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[E]],
-                        inMap:Map[Int,IndexedSeq[Int]], outMap:Map[Int,IndexedSeq[Int]]) extends Serializable{
+                        inMap:Map[Int,IndexedSeq[Int]], outMap:Map[Int,IndexedSeq[Int]],
+                        connectedMap:Map[(Int,Int), Boolean]) extends Serializable{
 
   lazy val roots = inMap.filter(_._2.isEmpty).map { case(ky,mp) => nodes(ky) }
 
@@ -29,11 +30,14 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
   }
 
   def removeNode(node: Node[N]):DGraph[N, E] = {
+    val nds = this.nodes.filterNot{case(id, v) => node == v && node.id == id}
+    val eds = TreeMap(this.edges.toList.filterNot(e => e._1._1 == node.id || e._1._2 == node.id):_*)
     this.copy(
-      nodes = this.nodes.filterNot{case(id, v) => node == v && node.id == id},
-      edges = TreeMap(this.edges.toList.filterNot(e => e._1._1 == node.id || e._1._2 == node.id):_*),
+      nodes = nds,
+      edges = eds,
       inMap = this.inMap.filterNot(_._1 == node.id).map{case(id, ins) => id -> ins.filterNot(_ == node.id)},
-      outMap = this.outMap.filterNot(_._1 == node.id).map{case(id, outs) => id -> outs.filterNot(_ == node.id)}
+      outMap = this.outMap.filterNot(_._1 == node.id).map{case(id, outs) => id -> outs.filterNot(_ == node.id)},
+      connectedMap = DGraph.warshall(nds, eds)
     )
   }
 
@@ -44,8 +48,9 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
   }
 
   def removeEdge(edge: DEdge[E]):DGraph[N, E] = {
+    val eds = this.edges.filterNot{case((f,t),e) => f == edge.from && t == edge.to && e == edge}
     this.copy(
-      edges = this.edges.filterNot{case((f,t),e) => f == edge.from && t == edge.to && e == edge},
+      edges = eds,
       inMap = {
         val ins = this.inMap(edge.to)
         this.inMap.updated(edge.to, ins.filterNot(_ == edge.from))
@@ -53,7 +58,8 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
       outMap = {
         val outs = this.outMap(edge.from)
         this.outMap.updated(edge.from, outs.filterNot(_ == edge.to))
-      }
+      },
+      connectedMap = DGraph.warshall(this.nodes, eds)
     )
   }
 
@@ -68,7 +74,8 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
       this.copy(
         nodes = nodes.updated(node.id,node),
         inMap = inMap.updated(node.id,inMap.getOrElse(node.id, IndexedSeq.empty[Int])),
-        outMap = outMap.updated(node.id,outMap.getOrElse(node.id, IndexedSeq.empty[Int]))
+        outMap = outMap.updated(node.id,outMap.getOrElse(node.id, IndexedSeq.empty[Int])),
+        connectedMap = DGraph.warshall(nodes.updated(node.id,node), this.edges)
       )
     )
   }
@@ -81,12 +88,14 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
 
   def addEdge(edge:DEdge[E]):Option[(DEdge[E], DGraph[N,E])] = {
     if (nodes.contains(edge.from) && nodes.contains(edge.to)) {
+      val eds = edges.updated((edge.from, edge.to), edge)
       Some(
         (edge,
           this.copy[N,E](
-            edges = edges.updated((edge.from, edge.to), edge),
+            edges = eds,
             inMap = inMap.updated(edge.to, inMap(edge.to) :+ edge.from),
-            outMap = outMap.updated(edge.from, outMap(edge.from) :+ edge.to)
+            outMap = outMap.updated(edge.from, outMap(edge.from) :+ edge.to),
+            connectedMap = DGraph.warshall(this.nodes, eds)
           )
         )
       )
@@ -96,11 +105,13 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
   def addNode(nodeContent:N, edgeContent:E, from:Int):(Node[N], DGraph[N,E]) = {
     val newNodeKey = if(nodes.nonEmpty) nodes.keys.max + 1 else 0
     val (node,newGraph) = addNode(Node(nodeContent, newNodeKey))
+    val eds = newGraph.edges.updated((from, newNodeKey), DEdge(edgeContent, from, newNodeKey))
     (node,
       newGraph.copy(
-        edges = newGraph.edges.updated((from, newNodeKey), DEdge(edgeContent, from, newNodeKey)),
+        edges = eds,
         inMap = newGraph.inMap.updated(newNodeKey, newGraph.inMap(newNodeKey) :+ from),
-        outMap = newGraph.outMap.updated(from, newGraph.outMap(from) :+ newNodeKey)
+        outMap = newGraph.outMap.updated(from, newGraph.outMap(from) :+ newNodeKey),
+        connectedMap = DGraph.warshall(newGraph.nodes, eds)
       )
     )
   }
@@ -111,20 +122,16 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
     val inM = if(inMap.contains(edge.to)) edge.from +: inMap(edge.to) else IndexedSeq(edge.from)
     val outM = if(outMap.contains(edge.from)) edge.to +: outMap(edge.from) else IndexedSeq(edge.to)
 
+    val eds = edges.updated((edge.from, edge.to), edge)
     q0.copy(
-      edges = edges.updated((edge.from, edge.to), edge),
+      edges = eds,
       inMap = inMap.updated(edge.to, inM),
-      outMap = outMap.updated(edge.from, outM)
+      outMap = outMap.updated(edge.from, outM),
+      connectedMap = DGraph.warshall(this.nodes, eds)
     )
   }
 
-//  def mtch(q:DGraph[NodeMatchLike[N] ,EdgeMatchLike[E]]):List[DGraph[N ,E]] =
-//    GraphMatch.mtch(this, q).map(x => x.getMatchedGraph(this,q))
 
-//  def mtch(q: QNode[NodeMatchLike[N] ,EdgeMatchLike[E]]):List[DGraph[N ,E]] = {
-//    val q1 = DGraph.from(q)
-//    mtch(q1)
-//  }
 
   def containsNode(n:N):Boolean = nodes.values.exists(_.value == n)
   def containsEdge(e:E):Boolean = edges.values.exists(_.value == e)
@@ -136,24 +143,24 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
 
   def mapByNodes[M](mapper:N => M):DGraph[M, E] = {
     val newNodes = nodes.map { case(i,n) => n.id -> Node(mapper(n.value), n.id)}
-    DGraph[M, E](newNodes, this.edges, this.inMap, this.outMap)
+    DGraph[M, E](newNodes, this.edges, this.inMap, this.outMap, this.connectedMap)
   }
 
   def mapByEdges[EE](mapper:E => EE):DGraph[N, EE] = {
     val newEdges = edges.map { case((f,t),e) => (f,t) -> DEdge(mapper(e.value), f, t)}
-    DGraph[N, EE](this.nodes, newEdges, this.inMap, this.outMap)
+    DGraph[N, EE](this.nodes, newEdges, this.inMap, this.outMap, this.connectedMap)
   }
 
   def map[M,EE](nodeMapper: N => M , edgeMapper: E => EE) = {
     val newNodes = nodes.map { case(i,n) => n.id -> Node(nodeMapper(n.value), n.id)}
     val newEdges = edges.map { case((f,t),e) => (f,t) -> DEdge(edgeMapper(e.value), f, t)}
-    DGraph[M, EE](newNodes, newEdges, this.inMap, this.outMap)
+    DGraph[M, EE](newNodes, newEdges, this.inMap, this.outMap, this.connectedMap)
   }
 
   def map[M,EE](nodeMapper: (Int, N) => M , edgeMapper: ((Int, Int), E) => EE) = {
     val newNodes = nodes.map { case(i,n) => n.id -> Node(nodeMapper(i, n.value), n.id)}
     val newEdges = edges.map { case((f,t),e) => (f,t) -> DEdge(edgeMapper((f,t), e.value), f, t)}
-    DGraph[M, EE](newNodes, newEdges, this.inMap, this.outMap)
+    DGraph[M, EE](newNodes, newEdges, this.inMap, this.outMap, this.connectedMap)
   }
 
   def filterNodes(nf: N => Boolean) = nodes.values.filter(x => nf(x.value))
@@ -304,6 +311,38 @@ case class DGraph[N,E] (nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[
     (this.copy(nodes = nds1, edges = eds1), this.copy(nodes = nds2, edges = eds2))
   }
 
+  def getComponents() = {
+    //connectedMap.groupBy(_._1._1).map(gr => gr._2).toList.sortBy(_.head._1._1).foreach(println)
+    val nds = this.nodes.keys.toList
+    val components = collection.mutable.Map.empty[Int, Set[Int]]
+    for(i <- nds){
+//      println(s"Node is: ${nodes(i)}")
+      var index = if(components.isEmpty) 0 else components.keySet.max
+      val c = components.filter{ case (gid, g) =>
+
+        g.exists ( n =>
+          //println(s" $n <--> $i ${connectedMap((n, i))}---${connectedMap((i, n))}  ${connectedMap((n, i)) || connectedMap((i, n))}")
+          connectedMap((n, i)) || connectedMap((i, n))
+        )
+      }
+      if(c.nonEmpty){
+        var g = c.head._2
+        c.tail.foreach(ng => ng._2.foreach(n => g = g + n))
+        components.update(c.head._1, g + i)
+        components.retain((ky, vl) => !c.tail.contains(ky))
+//        println(s"element in components ${components(c.head._1)}")
+      } else {
+//        println("adding new component")
+        index += 1
+        components.update(index, Set(i))
+      }
+    }
+    val grs = components.values.map(st => DGraph.from[N, E](this.nodes.filter(n => st.contains(n._1)),
+      this.edges.filter(e => st.contains(e._1._1) || st.contains(e._1._2))))
+    //components.values.toList.foreach(v => println(v))
+    grs.toList
+  }
+
 }
 
 trait HalfEdgeLike[+E,+N] extends Product with Serializable
@@ -359,12 +398,32 @@ object DGraphDSL {
     extract(graph, p, q, ed)
   }
 
+
   def query2[N, E, P](qNodes: QNodeLike[(NodeMatchLike[N], Extractor[N,P]), (EdgeMatchLike[E], Extractor[E,P])]) =
     DGraph.from(qNodes)
 
+  def breakOptional[N, E, P](q:DGraph[(NodeMatchLike[N], Extractor[N, P]), (EdgeMatchLike[E], Extractor[E, P])]):
+    List[DGraph[(NodeMatchLike[N], Extractor[N, P]), (EdgeMatchLike[E], Extractor[E, P])]]= {
+    val root = q.roots.head
+    val optionalEdges = q.edges.filter(_._2.value._1.optional).toList
+    //println(optionalEdges)
+    val perms = (1 to optionalEdges.size).flatMap(f => optionalEdges.combinations(f).toList)
+//    println(perms)
+    val qs = for (per <- perms) yield {
+      var g = q
+      per.foreach(e => g = g.removeEdge(e._2))
+      g.copy()
+    }
+
+//    println(qs.size)
+
+    (q +: qs).flatMap(q => q.getComponents()).filter(_.nodes.values.toList.contains(root))
+      .sortBy(g => -(g.nodes.size + g.edges.size)).toList
+  }
+
   def extract[N, E, P](g:DGraph[N, E], extractP:P,
                        q:DGraph[NodeMatchLike[N], EdgeMatchLike[E]],
-                       ed:DGraph[Extractor[N, P], Extractor[E, P]]) = {
+                       ed:DGraph[Extractor[N, P], Extractor[E, P]]):List[(DGraph[N, E], P)] = {
 
     val qExtractNodes = ed.nodes.map(n => n._1 -> n._2.value).toList
     val qExtractEdges = ed.edges.map(e => e._1 -> e._2.value).toList
@@ -391,7 +450,23 @@ object DGraphDSL {
       (gr, p)
     })
 
-    gm.toList
+    gm
+  }
+
+  def extractAll[N, E, P](g:DGraph[N, E], extractP:P,
+                          ed:DGraph[(NodeMatchLike[N], Extractor[N, P]), (EdgeMatchLike[E], Extractor[E, P])]) = {
+    val qs = breakOptional(ed)
+//    qs.foreach(q => println(q.nodes.size))
+    var matched = false
+    var eds = qs
+    var res = List.empty[(DGraph[N, E], P)]
+    while(!matched && eds.nonEmpty) {
+      val (q, ex) = eds.head.unzip
+      res = extract(g, extractP, q, ex)
+      matched = res.nonEmpty
+      eds = eds.tail
+    }
+    res
   }
 
 
@@ -402,10 +477,24 @@ object DGraphDSL {
     QNode[NodeMatchLike[N], EdgeMatch[E]](NodeMatchAND(n), edges: _*)
 
 
-  def --?>[N, E, P](e: E => Boolean, extract:(E, P) => P,
+  def edgeTo[N, E, P](e: E => Boolean, extract:(E, P) => P,
                     q: QNodeLike[(NodeMatchLike[N], Extractor[N,P]), (EdgeMatch[E], Extractor[E,P])]):
     HalfEdgeLike[(EdgeMatch[E], Extractor[E,P]), (NodeMatchLike[N], Extractor[N,P])] =
-    HalfEdge[(EdgeMatch[E], Extractor[E,P]), (NodeMatchLike[N], Extractor[N,P])]((EdgeMatch(e), Extractor(extract)), q)
+    //HalfEdge[(EdgeMatch[E], Extractor[E,P]), (NodeMatchLike[N], Extractor[N,P])]((EdgeMatch(e), Extractor(extract)), q)
+    HalfEdge((EdgeMatch(e), Extractor(extract)), q)
+
+  def --?>[N, E, P](e: E => Boolean, extract:(E, P) => P,
+                    q: QNodeLike[(NodeMatchLike[N], Extractor[N,P]), (EdgeMatch[E], Extractor[E,P])]) =
+    edgeTo(e, extract, q)
+
+  def edgeToOptional[N, E, P](e: E => Boolean, extract:(E, P) => P,
+                      q: QNodeLike[(NodeMatchLike[N], Extractor[N,P]), (EdgeMatch[E], Extractor[E,P])]):
+  HalfEdgeLike[(EdgeMatch[E], Extractor[E,P]), (NodeMatchLike[N], Extractor[N,P])] =
+    HalfEdge((EdgeMatch(e, optional = true), Extractor(extract)), q)
+
+  def --??>[N, E, P](e: E => Boolean, extract:(E, P) => P,
+                    q: QNodeLike[(NodeMatchLike[N], Extractor[N,P]), (EdgeMatch[E], Extractor[E,P])]) =
+    edgeToOptional(e, extract, q)
 
   def <-&[N, E, P](n: N => Boolean, extract:(N, P) => P,
                    edges: HalfEdgeLike[(EdgeMatch[E], Extractor[E, P]), (NodeMatchLike[N], Extractor[N, P])]*) =
@@ -437,8 +526,8 @@ object DGraph {
   }
 
   def from[N,E](nods:Map[Int, Node[N]], edgs:TreeMap[(Int,Int), DEdge[E]]):DGraph[N,E] = {
-    val (inM, outM) = mkEdgeMaps(nods,edgs)
-    DGraph(nods,edgs,inM,outM)
+    val (inM, outM, connected) = mkEdgeMaps(nods, edgs)
+    DGraph(nods, edgs, inM, outM, connected)
   }
 
   def from[N,E](qNodes:QNodeLike[N,E]*):DGraph[N,E] = {
@@ -448,7 +537,7 @@ object DGraph {
       nds match {
         case QNode(head, kids @ _*) :: remains=> {
           val kidsNode = kids.flatMap {
-            case HalfEdge(e,n) => Some(n)
+            case HalfEdge(e, n) => Some(n)
             case _ => None
           }
           loopForNodes(kidsNode.toList ::: remains)
@@ -457,14 +546,14 @@ object DGraph {
         case QNodeMarker(head, marker, kids @ _*) :: remains => {
           markers.update(marker,head)
           val kidsNode = kids.flatMap {
-            case HalfEdge(e,n) => Some(n)
+            case HalfEdge(e, n) => Some(n)
             case _ => None
           }
           loopForNodes(kidsNode.toList ::: remains)
         }
         case QNodeRef(rf, kids @ _*) :: remains => {
           val kidsNode = kids.flatMap {
-            case HalfEdge(e,n) => Some(n)
+            case HalfEdge(e, n) => Some(n)
             case _ => None
           }
           loopForNodes(kidsNode.toList ::: remains)
@@ -493,7 +582,7 @@ object DGraph {
           }
           val outNodes =
             kids.flatMap {
-              case HalfEdge(e,n) => {
+              case HalfEdge(e, n) => {
 
                 val tup = n match {
                   case QNode(n1, x @_*) => {
@@ -553,9 +642,18 @@ object DGraph {
 
 
   private def mkEdgeMaps[N,E](nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[E]])
-    :(Map[Int,IndexedSeq[Int]], Map[Int,IndexedSeq[Int]]) = {
+    :(Map[Int,IndexedSeq[Int]], Map[Int,IndexedSeq[Int]], Map[(Int,Int), Boolean]) = {
     val inM = scala.collection.mutable.Map.empty[Int,IndexedSeq[Int]]
     val outM = scala.collection.mutable.Map.empty[Int,IndexedSeq[Int]]
+    var connected = scala.collection.mutable.Map({
+      for {
+        (n1, _) <- nodes
+        (n2, _) <- nodes
+      } yield
+        (n1, n2) -> false
+
+    }.toList :_*)
+
 
     for(e <- edges.values) {
       //update IN
@@ -564,6 +662,8 @@ object DGraph {
       //update Out
       if(inM.contains(e.to)) inM.update(e.to, inM(e.to) :+ e.from)
       else inM.update(e.to, IndexedSeq(e.from))
+      //update connected
+      connected.update((e.from, e.to), true)
     }
 
     for(n <- nodes.values) {
@@ -571,7 +671,27 @@ object DGraph {
       if(!inM.contains(n.id)) inM.update(n.id, IndexedSeq())
     }
 
-    (inM.toMap, outM.toMap)
+    val nds = nodes.keys.toList
+    for(k<-nds; i <- nds; j <- nds)
+      connected.update((i,j), connected((i, j)) || (connected((i, k)) &&  connected((k, j))))
+    (inM.toMap, outM.toMap, connected.toMap)
+  }
+
+  private def warshall[N,E](nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[E]]): Map[(Int,Int), Boolean] = {
+    var connected = scala.collection.mutable.Map({
+      for {
+        (n1, _) <- nodes
+        (n2, _) <- nodes
+      } yield (n1, n2) -> false
+    }.toList :_*)
+
+    for(e <- edges.values)
+      connected.update((e.from, e.to), true)
+
+    val nds = nodes.keys.toList
+    for(k<-nds; i <- nds; j <- nds)
+      connected.update((i,j), connected((i, j)) || (connected((i, k)) &&  connected((k, j))))
+    connected.toMap
   }
 
 

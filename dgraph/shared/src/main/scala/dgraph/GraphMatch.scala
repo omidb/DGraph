@@ -14,11 +14,13 @@ case class NodeMatchOR[N](eval:(N => Boolean)) extends NodeMatchLike[N]
 
 
 trait EdgeMatchLike[E] extends Product with Serializable{
+  val optional:Boolean = false
   def eval:(E => Boolean)
 }
 
 
-case class EdgeMatch[E](eval:(E => Boolean)) extends EdgeMatchLike[E]
+case class EdgeMatch[E](eval:(E => Boolean), override val optional:Boolean = false)
+  extends EdgeMatchLike[E]
 case class EdgeMatchStar[E](eval:(E => Boolean)) extends EdgeMatchLike[E]
 
 case class Pentree(x:String)
