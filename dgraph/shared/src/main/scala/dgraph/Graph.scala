@@ -456,7 +456,11 @@ object DGraphDSL {
   def extractAll[N, E, P](g:DGraph[N, E], extractP:P,
                           ed:DGraph[(NodeMatchLike[N], Extractor[N, P]), (EdgeMatchLike[E], Extractor[E, P])]) = {
     val qs = breakOptional(ed)
-//    qs.foreach(q => println(q.nodes.size))
+    extractAll(g, extractP, qs)
+  }
+
+  def extractAll[N, E, P](g:DGraph[N, E], extractP:P,
+                          qs:List[DGraph[(NodeMatchLike[N], Extractor[N, P]), (EdgeMatchLike[E], Extractor[E, P])]]) = {
     var matched = false
     var eds = qs
     var res = List.empty[(DGraph[N, E], P)]
