@@ -655,14 +655,14 @@ object DGraph {
     :(Map[Int,IndexedSeq[Int]], Map[Int,IndexedSeq[Int]], Map[(Int,Int), Boolean]) = {
     val inM = scala.collection.mutable.Map.empty[Int,IndexedSeq[Int]]
     val outM = scala.collection.mutable.Map.empty[Int,IndexedSeq[Int]]
-    var connected = scala.collection.mutable.Map({
-      for {
-        (n1, _) <- nodes
-        (n2, _) <- nodes
-      } yield
-        (n1, n2) -> false
-
-    }.toList :_*)
+//    var connected = scala.collection.mutable.Map({
+//      for {
+//        (n1, _) <- nodes
+//        (n2, _) <- nodes
+//      } yield
+//        (n1, n2) -> false
+//
+//    }.toList :_*)
 
 
     for(e <- edges.values) {
@@ -673,7 +673,7 @@ object DGraph {
       if(inM.contains(e.to)) inM.update(e.to, inM(e.to) :+ e.from)
       else inM.update(e.to, IndexedSeq(e.from))
       //update connected
-      connected.update((e.from, e.to), true)
+//      connected.update((e.from, e.to), true)
     }
 
     for(n <- nodes.values) {
@@ -682,26 +682,28 @@ object DGraph {
     }
 
     val nds = nodes.keys.toList
-    for(k<-nds; i <- nds; j <- nds)
-      connected.update((i,j), connected((i, j)) || (connected((i, k)) &&  connected((k, j))))
-    (inM.toMap, outM.toMap, connected.toMap)
+//    for(k<-nds; i <- nds; j <- nds)
+//      connected.update((i,j), connected((i, j)) || (connected((i, k)) &&  connected((k, j))))
+//    (inM.toMap, outM.toMap, connected.toMap)
+    (inM.toMap, outM.toMap, Map.empty)
   }
 
   def warshall[N,E](nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[E]]): Map[(Int,Int), Boolean] = {
-    var connected = scala.collection.mutable.Map({
-      for {
-        (n1, _) <- nodes
-        (n2, _) <- nodes
-      } yield (n1, n2) -> false
-    }.toList :_*)
-
-    for(e <- edges.values)
-      connected.update((e.from, e.to), true)
-
-    val nds = nodes.keys.toList
-    for(k<-nds; i <- nds; j <- nds)
-      connected.update((i,j), connected((i, j)) || (connected((i, k)) &&  connected((k, j))))
-    connected.toMap
+//    var connected = scala.collection.mutable.Map({
+//      for {
+//        (n1, _) <- nodes
+//        (n2, _) <- nodes
+//      } yield (n1, n2) -> false
+//    }.toList :_*)
+//
+//    for(e <- edges.values)
+//      connected.update((e.from, e.to), true)
+//
+//    val nds = nodes.keys.toList
+//    for(k<-nds; i <- nds; j <- nds)
+//      connected.update((i,j), connected((i, j)) || (connected((i, k)) &&  connected((k, j))))
+//    connected.toMap
+    Map.empty
   }
 
 
