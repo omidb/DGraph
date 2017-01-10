@@ -438,14 +438,18 @@ object DGraphDSL {
 
       qExtractNodes.foreach {
         case(nid, fn) =>
-          val nd = ndMap.find(_._1.id == nid).get._2
-          p = fn.eval(nd.value, p)
+          if(ndMap.exists(_._1.id == nid)) {
+            val nd = ndMap.find(_._1.id == nid).get._2
+            p = fn.eval(nd.value, p)
+          }
       }
 
       qExtractEdges.foreach {
         case(eid, fn) =>
-          val ed = edgeMap.find(em => (em._1.from, em._1.to) == eid).get._2
-          p = fn.eval(ed.value, p)
+          if(edgeMap.exists(em => (em._1.from, em._1.to) == eid)) {
+            val ed = edgeMap.find(em => (em._1.from, em._1.to) == eid).get._2
+            p = fn.eval(ed.value, p)
+          }
       }
       (gr, p)
     })
@@ -454,13 +458,15 @@ object DGraphDSL {
   }
 
   def extractAll[N, E, P](g:DGraph[N, E], extractP:P,
-                          ed:DGraph[(NodeMatchLike[N], Extractor[N, P]), (EdgeMatchLike[E], Extractor[E, P])]) = {
+                          ed:DGraph[(NodeMatchLike[N], Extractor[N, P]), (EdgeMatchLike[E], Extractor[E, P])])
+  :List[(DGraph[N, E], P)] = {
     val qs = breakOptional(ed)
     extractAll(g, extractP, qs)
   }
 
   def extractAll[N, E, P](g:DGraph[N, E], extractP:P,
-                          qs:List[DGraph[(NodeMatchLike[N], Extractor[N, P]), (EdgeMatchLike[E], Extractor[E, P])]]) = {
+                          qs:List[DGraph[(NodeMatchLike[N], Extractor[N, P]), (EdgeMatchLike[E], Extractor[E, P])]]):
+  List[(DGraph[N, E], P)] = {
     var matched = false
     var eds = qs
     var res = List.empty[(DGraph[N, E], P)]
@@ -681,7 +687,7 @@ object DGraph {
     (inM.toMap, outM.toMap, connected.toMap)
   }
 
-  private def warshall[N,E](nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[E]]): Map[(Int,Int), Boolean] = {
+  def warshall[N,E](nodes:Map[Int, Node[N]], edges:TreeMap[(Int,Int), DEdge[E]]): Map[(Int,Int), Boolean] = {
     var connected = scala.collection.mutable.Map({
       for {
         (n1, _) <- nodes

@@ -31,24 +31,28 @@ object tmp extends App{
 
 }
 
-case class Branch[N](solution:Map[Node[NodeMatchLike[N]], Node[N]],
+case class Branch[N](id:Int, solution:Map[Node[NodeMatchLike[N]], Node[N]],
                        goals:Map[Node[N], Node[NodeMatchLike[N]]]) {
 
   def getMatchedGraph[E](g:DGraph[N,E], q:DGraph[NodeMatchLike[N] , EdgeMatchLike[E]])= {
-    var gr = DGraph.empty[N,E]
+    var gr = DGraph.empty[N,E]()
     val edgeMap = collection.mutable.Map.empty[DEdge[EdgeMatchLike[E]], DEdge[E]]
     for(((from, to), e) <- q.edges) {
-      val fromN = solution(q.nodes(from))
-      val toN = solution(q.nodes(to))
-      val ge = g.edges((fromN.id, toN.id))
-      gr = gr.updated(fromN,toN,ge)
-      edgeMap.update(e,ge)
+      if(solution.contains(q.nodes(from)) && solution.contains(q.nodes(to))) {
+        val fromN = solution(q.nodes(from))
+        val toN = solution(q.nodes(to))
+        val ge = g.edges((fromN.id, toN.id))
+        gr = gr.updated(fromN, toN, ge)
+        edgeMap.update(e, ge)
+      }
     }
 
     for((index, n) <- q.nodes) {
-      val x = solution(n)
-      if(!gr.nodes.contains(x.id)) {
-        gr = gr.addNode(x)._2
+      if(solution.contains(n)) {
+        val x = solution(n)
+        if (!gr.nodes.contains(x.id)) {
+          gr = gr.addNode(x)._2
+        }
       }
     }
     (gr, solution, edgeMap.toMap)
@@ -57,8 +61,11 @@ case class Branch[N](solution:Map[Node[NodeMatchLike[N]], Node[N]],
 
 object GraphMatch {
 
+
   def mtch[N,E](g:DGraph[N,E], q:DGraph[NodeMatchLike[N] , EdgeMatchLike[E]]) = {
     var finalSolutions = Queue.empty[Branch[N]]
+    var branchParent = DGraph.empty[Int, Int]()
+    var bId = -1
     val qRoots = q.roots
 
     for(r <- qRoots) {
@@ -68,12 +75,16 @@ object GraphMatch {
         var branches = Queue.empty[Branch[N]]
         //val ss = Branch(Map.empty[Node[NodeMatchLike[N]], Node[N]], Map[Node[N], Node[NodeMatchLike[N]]](n -> r))
 
-        if(finalSolutions.isEmpty)
-          branches = branches.enqueue(Branch(Map.empty[Node[NodeMatchLike[N]], Node[N]], 
-            Map[Node[N], Node[NodeMatchLike[N]]](n -> r)))
+        if(finalSolutions.isEmpty) {
+          bId += 1
+          branchParent = branchParent.addNode(bId)._2
+          branches = branches.enqueue(
+            Branch(bId, Map.empty[Node[NodeMatchLike[N]], Node[N]], Map[Node[N], Node[NodeMatchLike[N]]](n -> r)))
+
+        }
         else {
-            finalSolutions.foreach(br =>
-              branches = branches.enqueue(br.copy[N](goals = Map[Node[N], Node[NodeMatchLike[N]]](n -> r))))
+          finalSolutions.foreach(br =>
+            branches = branches.enqueue(br.copy[N](goals = Map[Node[N], Node[NodeMatchLike[N]]](n -> r))))
         }
 
         while (branches.nonEmpty) {
@@ -90,25 +101,35 @@ object GraphMatch {
               branches = branches.enqueue(br1)
             else if (!br1.solution.contains(qNode) && !br1.solution.values.toList.contains(gNode)) {
               val br2 = br1.copy(solution = br1.solution.updated(qNode, gNode))
-
-              val goalChilds = q.childs(qNode.id).zip(q.childsEdges(qNode.id))
-              val perms = qNode.value match {
-                case NodeMatchAND(_) => g.childs(gNode.id).zip(g.childsEdges(gNode.id)).toList
-                    .combinations(goalChilds.size).toList
-                    .flatMap(comb => comb.permutations.toList)
-                case NodeMatchOR(_) => g.childs(gNode.id).zip(g.childsEdges(gNode.id)).toList.map(List(_))
-              }
-
+              val goalChilds1 = q.childs(qNode.id).zip(q.childsEdges(qNode.id))
+              //
+              val (optionals, requierd) = goalChilds1.partition(_._2.value.optional)
+              val optionalPerm = (1 to optionals.size).flatMap(f => optionals.combinations(f).toList)
+              val newSetGolaChilds = if(requierd.nonEmpty) optionalPerm.map(op => requierd ++ op) :+ requierd else optionalPerm.map(op => requierd ++ op)
+              //
               val tupList = qNode.value match {
-                case NodeMatchAND(_) => perms.map(x => x.zip(goalChilds))
-                case NodeMatchOR(_) => perms.flatMap(x => goalChilds.map(y => x.zip(List(y))))
+                case NodeMatchAND(_) =>
+                  newSetGolaChilds.toList.flatMap(goalChilds => {
+                    g.childs(gNode.id).zip(g.childsEdges(gNode.id)).toList
+                      .combinations(goalChilds.size).toList
+                      .flatMap(comb => comb.permutations.toList)
+                      .map(lst => lst.zip(goalChilds))
+                  })
+                case NodeMatchOR(_) => //this probably won't work with optional and could be 100% wrong
+                  g.childs(gNode.id).zip(g.childsEdges(gNode.id)).toList.map(List(_))
+                    .flatMap(x => goalChilds1.map(y => x.zip(List(y))))
               }
 
               if ((tupList.isEmpty || tupList.head == Nil) && g.childs(gNode.id).size >= q.childs(qNode.id).size)
                 branches = branches.enqueue(br2)
               else {
-                val newBranches = childsMatch(tupList, br2)
+                val (newBranches, nbid, nbranchParent) = childsMatch(tupList, br2, bId, branchParent)
+                bId = nbid
+                branchParent = nbranchParent
                 newBranches.flatten.foreach(b => branches = branches.enqueue(b))
+                if(requierd.isEmpty)
+                  branches = branches.enqueue(br2)
+
               }
             }
           }
@@ -117,25 +138,28 @@ object GraphMatch {
       finalSolutions = localFinalSolutions
     }
 
-    finalSolutions.toList
-    //println(finalSolutions.size)
+    val solutionMaps = finalSolutions.toList.map(b => b.id -> b.solution.map(s => s._1.id -> s._2.id).toSet).toMap
+    val viableBranches = solutionMaps.filterNot{case (bid, sm) => solutionMaps.filterNot(_._1 == bid).values.exists(sm2 => sm.subsetOf(sm2))}.keySet
+    finalSolutions.toList.filter(b => viableBranches.contains(b.id))
+
   }
-
-
-
   private def childsMatch[N,E](tupList:List[List[((Node[N], DEdge[E]), (Node[NodeMatchLike[N]], DEdge[EdgeMatchLike[E]]))]],
-                               br:Branch[N]) = {
-    for (tup <- tupList) yield {
-
-
-
+                               br:Branch[N], currentBId:Int, branchParent:DGraph[Int, Int]) = {
+    var bId = currentBId
+    var brp = branchParent
+    val brs = for (tup <- tupList) yield {
       if (tup.forall(x => singleMatch(x._1._1, x._2._1, x._1._2, x._2._2)) &&
         //redunduncy check
-        tup.forall(x => (!br.goals.contains(x._1._1)) || (br.goals.contains(x._1._1) && br.goals(x._1._1) == x._2._1))){
+        tup.forall(x => (!br.goals.contains(x._1._1)) || (br.goals.contains(x._1._1) && br.goals(x._1._1) == x._2._1))) {
         val newGoals = br.goals ++ tup.filter(xy => !br.goals.contains(xy._1._1)).map(xy => xy._1._1 -> xy._2._1)
-        Some(br.copy(goals = newGoals))
+        bId += 1
+        brp = brp.addNode(bId, 0, brp.nodes.find(_._2.value == br.id).get._1)._2
+        Some(br.copy(goals = newGoals, id = bId))
+
+
       } else None
     }
+    (brs, bId, brp.copy())
   }
 
   private def singleMatch[N,E](b:Node[N], B:Node[NodeMatchLike[N]], e:DEdge[E], E:DEdge[EdgeMatchLike[E]]) = {
@@ -143,8 +167,6 @@ object GraphMatch {
       E.value.eval(e.value)) true
     else false
   }
-
-
 }
 
 

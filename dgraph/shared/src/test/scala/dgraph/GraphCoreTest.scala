@@ -133,7 +133,7 @@ object DGraphCoreTest extends TestSuite {
       val res = g.filter(q)
 
       val res2 = g filter q1
-
+      println(g2.filter(q2))
       assert(g2.filter(q2).nonEmpty)
 
 //      assert(res2.size == 0)
@@ -161,10 +161,25 @@ object DGraphCoreTest extends TestSuite {
       )
 
 
+      val q3 = query2[String, String, SimpleExtract](
+        <-&(n => n == "n0", (n, p) => p.copy(n0 = n),
+          --?>(_ == "e2", (e,p) => p,
+            <-&(_ == "n3", (n, p) => p.copy(n3 = n),
+              --??>(_ == "e3", (e,p) => p.copy(e3 = e), <-&(_ == "n4",(n,p) => p)),
+              --??>(_ == "e30", (e,p) => p.copy(e3 = e), <-&(_ == "n4",(n,p) => p))
+            ))
+        )
+      )
+
+
       val (q,ed) = q2.unzip
       val res = extract(g, SimpleExtract("", "", ""), q, ed)
-      println(res.head._2)
+
+      val (q0,ed0) = q3.unzip
+      val res0 = extract(g, SimpleExtract("", "", ""), q0, ed0)
+
       assert(res.head._2 == SimpleExtract("n0", "n3", "e3"))
+      assert(res0.head._2 == SimpleExtract("n0", "n3", "e3"))
     }
 
     'traverseDFS {
