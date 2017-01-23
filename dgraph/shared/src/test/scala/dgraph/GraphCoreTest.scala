@@ -153,20 +153,20 @@ object DGraphCoreTest extends TestSuite {
       )
 
       val q2 = query2[String, String, SimpleExtract](
-        <-&(n => n == "n0", (n, p) => p.copy(n0 = n),
-          --?>(_ == "e2", (e,p) => p,
-            <-&(_ == "n3", (n, p) => p.copy(n3 = n),
-              --?>(_ == "e3", (e,p) => p.copy(e3 = e), <-&(_ == "n4",(n,p) => p))))
+        <-&(n => n == "n0", (i, n, p) => p.copy(n0 = n),
+          --?>(_ == "e2", (i, e,p) => p,
+            <-&(_ == "n3", (i, n, p) => p.copy(n3 = n),
+              --?>(_ == "e3", (i, e,p) => p.copy(e3 = e), <-&(_ == "n4",(i, n,p) => p))))
         )
       )
 
 
       val q3 = query2[String, String, SimpleExtract](
-        <-&(n => n == "n0", (n, p) => p.copy(n0 = n),
-          --?>(_ == "e2", (e,p) => p,
-            <-&(_ == "n3", (n, p) => p.copy(n3 = n),
-              --??>(_ == "e3", (e,p) => p.copy(e3 = e), <-&(_ == "n4",(n,p) => p)),
-              --??>(_ == "e30", (e,p) => p.copy(e3 = e), <-&(_ == "n4",(n,p) => p))
+        <-&(n => n == "n0", (i, n, p) => p.copy(n0 = n),
+          --?>(_ == "e2", (i, e,p) => p,
+            <-&(_ == "n3", (i, n, p) => p.copy(n3 = n),
+              --??>(_ == "e3", (i, e,p) => p.copy(e3 = e), <-&(_ == "n4",(i, n,p) => p)),
+              --??>(_ == "e30", (i, e,p) => p.copy(e3 = e), <-&(_ == "n4",(i, n,p) => p))
             ))
         )
       )
